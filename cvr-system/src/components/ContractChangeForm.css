@@ -1,0 +1,148 @@
+.contract-change-form-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.ccr-modal-content {
+    background: var(--bg-card, #fff); /* Fallback to white if var invalid */
+    width: 90%;
+    max-width: 1000px;
+    height: 90vh;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    color: var(--text-primary, #333);
+}
+
+.form-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-subtle, #eee);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-secondary, #f8f9fa);
+}
+
+.form-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--text-secondary, #666);
+}
+
+.ccr-form {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-section {
+    border: 1px solid var(--border-subtle, #eee);
+    border-radius: 8px;
+    padding: 1rem;
+    background: var(--bg-primary, #fff);
+}
+
+.form-section legend {
+    font-weight: 600;
+    padding: 0 0.5rem;
+    color: var(--accent-primary, #007bff);
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap; /* Safety for small screens */
+}
+
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 200px;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary, #555);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 0.5rem;
+    border: 1px solid var(--border-subtle, #ccc);
+    border-radius: 4px;
+    background: var(--bg-input, #fff);
+    color: var(--text-primary, #000);
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-subtle, #eee);
+}
+
+.text-danger {
+    color: #ff6b6b;
+}
+
+.text-success {
+    color: #51cf66;
+}
+
+/* Button styles matching project likely conventions or generic fallbacks */
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background: var(--accent-primary, #007bff);
+    color: white;
+}
+
+.btn-secondary {
+    background: var(--bg-secondary, #e9ecef);
+    color: var(--text-primary, #333);
+}
+
+.contract-change-form-overlay table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.contract-change-form-overlay th, 
+.contract-change-form-overlay td {
+    padding: 0.5rem;
+    border: 1px solid var(--border-subtle, #eee);
+    text-align: left;
+}

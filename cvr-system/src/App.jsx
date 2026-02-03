@@ -10,6 +10,7 @@ import Reports from './pages/Reports'
 import Modeling from './pages/Modeling'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
+import ContractChanges from './pages/ContractChanges'
 import './App.css'
 
 const queryClient = new QueryClient()
@@ -34,6 +35,7 @@ function App() {
             <Route path="reports" element={<Reports />} />
             <Route path="modeling" element={<Modeling />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="changes" element={<ContractChanges />} />
             {/* Add more routes as we build them */}
           </Route>
         </Routes>
