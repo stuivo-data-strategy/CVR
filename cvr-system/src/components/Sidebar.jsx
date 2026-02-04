@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, FileText, PieChart, Settings, Calculator } from 'lucide-react'
+import { LayoutDashboard, FileText, PieChart, Settings, Calculator, TrendingUp } from 'lucide-react'
 import styles from './Sidebar.module.css'
 import { cn } from '../lib/utils'
 
