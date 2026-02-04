@@ -4,8 +4,13 @@ import { supabase } from '../../lib/supabase'
 import { Checkbox } from '../ui/Checkbox' // Assuming we have or will treat basic input
 import { Badge } from 'lucide-react'
 
+import { ContractChangeForm } from '../ContractChangeForm'
+import { Plus } from 'lucide-react'
+import { useState } from 'react'
+
 export default function ScenarioChangeBundler({ contractId, scenarioId }) {
     const queryClient = useQueryClient()
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
     // 1. Fetch ALL Proposed Changes for this Contract
     const { data: proposedChanges, isLoading: changesLoading } = useQuery({
@@ -63,9 +68,17 @@ export default function ScenarioChangeBundler({ contractId, scenarioId }) {
         <div className="border rounded-md bg-white">
             <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
                 <h4 className="font-semibold text-sm">Bundle Proposed Changes</h4>
-                <span className="text-xs text-gray-500 bg-white border px-2 py-0.5 rounded">
-                    {proposedChanges?.length} available
-                </span>
+                <div className="flex gap-2 items-center">
+                    <span className="text-xs text-gray-500 bg-white border px-2 py-0.5 rounded">
+                        {proposedChanges?.length} available
+                    </span>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="text-xs flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100 transition-colors"
+                    >
+                        <Plus size={12} /> New Proposal
+                    </button>
+                </div>
             </div>
             <div className="max-h-[300px] overflow-y-auto p-2 space-y-2">
                 {proposedChanges?.map(change => {
@@ -95,10 +108,20 @@ export default function ScenarioChangeBundler({ contractId, scenarioId }) {
                 })}
                 {proposedChanges?.length === 0 && (
                     <div className="text-center p-4 text-gray-400 text-xs">
-                        No 'Proposed' changes found to bundle.
+                        No 'Proposed' changes found. Click "New Proposal" to create one.
                     </div>
                 )}
             </div>
+
+            {isCreateModalOpen && (
+                <ContractChangeForm
+                    contractId={contractId}
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onSuccess={() => {
+                        queryClient.invalidateQueries(['proposed_changes', contractId])
+                    }}
+                />
+            )}
         </div>
     )
 }

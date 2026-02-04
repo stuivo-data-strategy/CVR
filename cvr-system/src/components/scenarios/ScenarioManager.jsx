@@ -43,6 +43,85 @@ export default function ScenarioManager({ contractId, selectedScenarioId, onScen
         }
     })
 
+    // Promote Scenario
+    const promoteMutation = useMutation({
+        mutationFn: async (id) => {
+            // 1. Get linked changes
+            const { data: links } = await supabase
+                .from('contract_scenario_changes')
+                .select('contract_change_id, contract_changes(*, contract_change_impacts(*))')
+                .eq('scenario_id', id)
+
+            if (!links || links.length === 0) throw new Error("No changes in this scenario to promote")
+
+            const changes = links.map(l => l.contract_changes)
+            const changeIds = changes.map(c => c.id)
+
+            // 2. Update status to 'approved'
+            const { error: updateErr } = await supabase
+                .from('contract_changes')
+                .update({ status: 'approved', approval_date: new Date().toISOString() })
+                .in('id', changeIds)
+
+            if (updateErr) throw updateErr
+
+            // 3. Bake into Base Forecast (Revenue/Costs)
+            // We need to map impacts (by Month) to Contract Periods (by ID)
+
+            // 3a. Fetch Periods
+            const { data: periods } = await supabase
+                .from('contract_periods')
+                .select('id, period_month')
+                .eq('contract_id', contractId)
+
+            const periodMap = new Map() // 'YYYY-MM-DD' -> uuid
+            periods?.forEach(p => periodMap.set(p.period_month, p.id))
+
+            const revInserts = []
+            const costInserts = []
+
+            for (const change of changes) {
+                // If detailed impacts exist, use them. Else use Headline.
+                const hasDetailed = change.contract_change_impacts && change.contract_change_impacts.length > 0
+
+                if (hasDetailed) {
+                    for (const imp of change.contract_change_impacts) {
+                        const pid = periodMap.get(imp.period_month)
+                        if (pid) {
+                            if (imp.revenue_delta) revInserts.push({ contract_period_id: pid, revenue_type: 'forecast', amount: imp.revenue_delta })
+                            if (imp.cost_delta) costInserts.push({ contract_period_id: pid, cost_type: 'forecast', amount: imp.cost_delta })
+                        }
+                    }
+                } else {
+                    // Headline Fallback
+                    // Normalize effective date to 1st of month
+                    const effDate = new Date(change.effective_date)
+                    effDate.setDate(1)
+                    const dateKey = effDate.toISOString().slice(0, 10)
+                    const pid = periodMap.get(dateKey)
+
+                    if (pid) {
+                        if (change.revenue_delta) revInserts.push({ contract_period_id: pid, revenue_type: 'forecast', amount: change.revenue_delta })
+                        if (change.cost_delta) costInserts.push({ contract_period_id: pid, cost_type: 'forecast', amount: change.cost_delta })
+                    }
+                }
+            }
+
+            if (revInserts.length) await supabase.from('contract_revenue').insert(revInserts)
+            if (costInserts.length) await supabase.from('contract_costs').insert(costInserts)
+
+            // 4. Unlink from Scenario (Cleanup)
+            await supabase.from('contract_scenario_changes').delete().eq('scenario_id', id)
+
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['scenarios', contractId])
+            queryClient.invalidateQueries(['contract', contractId])
+            queryClient.invalidateQueries(['financials', contractId]) // Force chart refresh
+            alert('Scenario promoted! Changes are now Approved and added to the Forecast.')
+        }
+    })
+
     // Delete Scenario
     const deleteMutation = useMutation({
         mutationFn: async (id) => {
@@ -62,11 +141,16 @@ export default function ScenarioManager({ contractId, selectedScenarioId, onScen
 
     return (
         <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 border-b">
-                <CardTitle className="text-sm font-medium">Saved Scenarios</CardTitle>
-                <Button size="sm" variant="ghost" onClick={() => setIsCreating(true)} disabled={isCreating}>
-                    <Plus size={16} />
-                </Button>
+            <CardHeader className="flex flex-col gap-2 pb-2 border-b">
+                <div className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm font-medium">Saved Scenarios</CardTitle>
+                </div>
+                {!isCreating && (
+                    <Button size="sm" variant="outline" className="w-full flex items-center justify-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => setIsCreating(true)}>
+                        <Plus size={16} />
+                        Create New Scenario
+                    </Button>
+                )}
             </CardHeader>
             <CardContent className="p-0">
                 {isCreating && (
@@ -97,23 +181,38 @@ export default function ScenarioManager({ contractId, selectedScenarioId, onScen
                     {scenarios?.map(scenario => (
                         <div
                             key={scenario.id}
-                            className={`flex items-center justify-between p-3 border-b cursor-pointer hover:bg-gray-50 transition-colors ${selectedScenarioId === scenario.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}
+                            className={`flex flex-col p-3 border-b cursor-pointer hover:bg-gray-50 transition-colors ${selectedScenarioId === scenario.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}
                             onClick={() => onScenarioSelect(scenario.id)}
                         >
-                            <div className="flex flex-col">
+                            <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium text-gray-800">{scenario.name}</span>
-                                <span className="text-xs text-gray-500">{scenario.scenario_type}</span>
+                                {selectedScenarioId === scenario.id && (
+                                    <button
+                                        className="text-gray-400 hover:text-red-500 p-1"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (confirm('Delete this scenario?')) deleteMutation.mutate(scenario.id)
+                                        }}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
                             </div>
+                            <span className="text-xs text-gray-500 mb-2">{scenario.scenario_type}</span>
+
                             {selectedScenarioId === scenario.id && (
-                                <button
-                                    className="text-gray-400 hover:text-red-500 p-1"
+                                <Button
+                                    size="sm"
+                                    className="w-full mt-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
                                     onClick={(e) => {
                                         e.stopPropagation()
-                                        if (confirm('Delete this scenario?')) deleteMutation.mutate(scenario.id)
+                                        if (confirm('Promote this scenario? \n\nThis will APPROVE all associated changes and add them to the official forecast.')) {
+                                            promoteMutation.mutate(scenario.id)
+                                        }
                                     }}
                                 >
-                                    <Trash2 size={14} />
-                                </button>
+                                    Promote to Forecast
+                                </Button>
                             )}
                         </div>
                     ))}

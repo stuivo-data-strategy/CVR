@@ -64,7 +64,7 @@ export default function ContractDetail() {
                                 {contract.status.replace('_', ' ')}
                             </span>
                         </h1>
-                        <p className="text-gray-500">{contract.customer_name} • {contract.business_unit} • {contract.sector}</p>
+                        <p className="text-gray-500">{contract.customer_name} • {contract.portfolio} • {contract.sector}</p>
                     </div>
                 </div>
 

@@ -21,3 +21,7 @@ export function CardTitle({ className, children, ...props }) {
 export function CardContent({ className, children, ...props }) {
     return <div className={cn(styles.content, className)} {...props}>{children}</div>
 }
+
+export function CardDescription({ className, children, ...props }) {
+    return <p className={cn("text-sm text-muted-foreground", className)} {...props}>{children}</p>
+}

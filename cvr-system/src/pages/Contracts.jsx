@@ -12,7 +12,7 @@ import styles from './Contracts.module.css'
 
 export default function Contracts() {
     const [statusFilter, setStatusFilter] = useState('all')
-    const [buFilter, setBuFilter] = useState('all')
+    const [portfolioFilter, setPortfolioFilter] = useState('all')
     const [sectorFilter, setSectorFilter] = useState('all')
     const [sortField, setSortField] = useState('created_at')
     const [sortOrder, setSortOrder] = useState('desc')
@@ -22,7 +22,7 @@ export default function Contracts() {
     const queryClient = useQueryClient()
 
     const { data: contracts, isLoading, error } = useQuery({
-        queryKey: ['contracts', statusFilter, buFilter, sectorFilter, sortField, sortOrder],
+        queryKey: ['contracts', statusFilter, portfolioFilter, sectorFilter, sortField, sortOrder],
         queryFn: async () => {
             let query = supabase
                 .from('contracts')
@@ -36,7 +36,7 @@ export default function Contracts() {
             target_margin_pct,
             start_date,
             end_date,
-            business_unit,
+            portfolio,
             sector
         `)
                 .order(sortField, { ascending: sortOrder === 'asc' })
@@ -44,8 +44,8 @@ export default function Contracts() {
             if (statusFilter !== 'all') {
                 query = query.eq('status', statusFilter)
             }
-            if (buFilter !== 'all') {
-                query = query.eq('business_unit', buFilter)
+            if (portfolioFilter !== 'all') {
+                query = query.eq('portfolio', portfolioFilter)
             }
             if (sectorFilter !== 'all') {
                 query = query.eq('sector', sectorFilter)
@@ -116,13 +116,15 @@ export default function Contracts() {
                     </select>
                     <select
                         className={styles.select}
-                        value={buFilter}
-                        onChange={(e) => setBuFilter(e.target.value)}
+                        value={portfolioFilter}
+                        onChange={(e) => setPortfolioFilter(e.target.value)}
                     >
-                        <option value="all">BU: All</option>
-                        <option value="Construction">Construction</option>
-                        <option value="Infrastructure">Infrastructure</option>
-                        <option value="Services">Services</option>
+                        <option value="all">Portfolio: All</option>
+                        <option value="PF00001">PF00001 (Infra-Pub)</option>
+                        <option value="PF00002">PF00002 (Const-Pub)</option>
+                        <option value="PF00003">PF00003 (Serv-Pub)</option>
+                        <option value="PF00004">PF00004 (Const-Com)</option>
+                        <option value="PF00005">PF00005 (Serv-Com)</option>
                     </select>
                     <select
                         className={styles.select}
@@ -144,9 +146,9 @@ export default function Contracts() {
                         <thead>
                             <tr>
                                 {[
+                                    { label: 'Portfolio', field: 'portfolio' },
                                     { label: 'Code', field: 'contract_code' },
                                     { label: 'Contract Name', field: 'name' },
-                                    { label: 'BU', field: 'business_unit' },
                                     { label: 'Sector', field: 'sector' },
                                     { label: 'Status', field: 'status' },
                                     { label: 'Value', field: 'original_value' },
@@ -180,13 +182,14 @@ export default function Contracts() {
                         <tbody>
                             {contracts?.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="text-center p-8 text-gray-500">
+                                    <td colSpan={10} className="text-center p-8 text-gray-500">
                                         No contracts found. Create one to get started.
                                     </td>
                                 </tr>
                             ) : (
                                 contracts?.map((contract) => (
                                     <tr key={contract.id} className={styles.tr}>
+                                        <td className={styles.td}>{contract.portfolio}</td>
                                         <td className={styles.td}>
                                             <Link to={`/contracts/${contract.id}`} className={styles.link}>
                                                 {contract.contract_code}
@@ -195,7 +198,6 @@ export default function Contracts() {
                                         <td className={styles.td}>
                                             <span className="font-medium">{contract.name}</span>
                                         </td>
-                                        <td className={styles.td}>{contract.business_unit}</td>
                                         <td className={styles.td}>{contract.sector}</td>
 
                                         <td className={styles.td}>

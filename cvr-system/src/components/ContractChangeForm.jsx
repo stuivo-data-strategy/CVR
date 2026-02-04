@@ -196,24 +196,9 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                 // ... forecast fields
             }
 
-            // Update or Insert
-            const { data: changeParams, error: mainError } = await supabase
-                .from('contract_changes')
-                .upsert(insertData) // upsert needs id if updating, but emptyChange generates ID. Ideally we let Supabase gen ID or use formData.id
-                .select()
-                .single()
-
-            if (mainError) throw mainError
-
-            // 3. Handle Impacts (Delete all and re-insert for simplicity)
-            // Ideally we do smart diffing, but for this prototype, delete by change_id and insert is safer
-            // Note: Use the ID returned from DB or formData.id if we force it.
-            // Since we didn't pass ID in upsert above (unless we add it), we rely on returned.
-            // Let's assume we are creating NEW each time for now or we must include ID in upsert if editing.
-            // Correction: upsert needs ID to update.
-
-            // Re-write regarding ID:
-            let finalId = formData.id // if we decide to force UUID client side
+            // 3. Upsert Contract Change
+            // Use local ID to ensure we can link impacts immediately
+            const finalId = formData.id
 
             const { error: upsertErr } = await supabase.from('contract_changes').upsert({
                 id: finalId,

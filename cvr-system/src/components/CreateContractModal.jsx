@@ -30,6 +30,7 @@ export default function CreateContractModal({ open, onOpenChange }) {
                 ...formData,
                 original_value: formData.original_value ? parseFloat(formData.original_value) : 0,
                 target_margin_pct: formData.target_margin_pct ? parseFloat(formData.target_margin_pct) : 0,
+                target_margin_pct: formData.target_margin_pct ? parseFloat(formData.target_margin_pct) : 0,
                 status: 'active'
             }
         ])
@@ -46,6 +47,8 @@ export default function CreateContractModal({ open, onOpenChange }) {
                 start_date: '',
                 original_value: '',
                 target_margin_pct: '',
+                portfolio: '',
+                sector: '',
             })
         }
         setLoading(false)
@@ -81,6 +84,14 @@ export default function CreateContractModal({ open, onOpenChange }) {
                     <div className={styles.field}>
                         <label className={styles.label}>Target Margin %</label>
                         <input type="number" step="0.1" name="target_margin_pct" value={formData.target_margin_pct} onChange={handleChange} className={styles.input} placeholder="15.0" />
+                    </div>
+                    <div className={styles.field}>
+                        <label className={styles.label}>Portfolio</label>
+                        <input name="portfolio" value={formData.portfolio || ''} onChange={handleChange} className={styles.input} placeholder="e.g. PF00001" />
+                    </div>
+                    <div className={styles.field}>
+                        <label className={styles.label}>Sector</label>
+                        <input name="sector" value={formData.sector || ''} onChange={handleChange} className={styles.input} placeholder="e.g. Public" />
                     </div>
                 </DialogContent>
                 <DialogFooter>

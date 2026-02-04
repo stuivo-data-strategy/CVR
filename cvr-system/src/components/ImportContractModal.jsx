@@ -13,7 +13,7 @@ export default function ImportContractModal({ isOpen, onClose, onSuccess }) {
     const addLog = (msg) => setLog(prev => [...prev, msg])
 
     const downloadTemplate = () => {
-        const headers = [['Contract Code', 'Name', 'Customer', 'Value', 'Start Date (YYYY-MM-DD)', 'End Date', 'BU', 'Sector', 'Status']]
+        const headers = [['Contract Code', 'Name', 'Customer', 'Value', 'Start Date (YYYY-MM-DD)', 'End Date', 'Portfolio', 'Sector', 'Status']]
         const ws = XLSX.utils.aoa_to_sheet(headers)
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, "Template")
@@ -115,7 +115,9 @@ export default function ImportContractModal({ isOpen, onClose, onSuccess }) {
                     original_value: originalValue,
                     start_date: startDate,
                     end_date: endDate,
-                    business_unit: row['BU'],
+                    portfolio: row['Portfolio'] || row['BU'],
+                    sector: row['Sector'],
+                    status: status
                     sector: row['Sector'],
                     status: status
                 }, { onConflict: 'contract_code' }).select().single()
