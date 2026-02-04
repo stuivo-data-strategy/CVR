@@ -146,8 +146,8 @@ export default function Contracts() {
                                 {[
                                     { label: 'Code', field: 'contract_code' },
                                     { label: 'Contract Name', field: 'name' },
-                                    { label: 'Customer', field: 'customer_name' },
                                     { label: 'BU', field: 'business_unit' },
+                                    { label: 'Sector', field: 'sector' },
                                     { label: 'Status', field: 'status' },
                                     { label: 'Value', field: 'original_value' },
                                     { label: 'Margin %', field: 'target_margin_pct' },
@@ -195,13 +195,9 @@ export default function Contracts() {
                                         <td className={styles.td}>
                                             <span className="font-medium">{contract.name}</span>
                                         </td>
-                                        <td className={styles.td}>{contract.customer_name}</td>
-                                        <td className={styles.td}>
-                                            <div className="flex flex-col text-xs">
-                                                <span className="font-medium">{contract.business_unit || '-'}</span>
-                                                <span className="text-gray-500">{contract.sector || '-'}</span>
-                                            </div>
-                                        </td>
+                                        <td className={styles.td}>{contract.business_unit}</td>
+                                        <td className={styles.td}>{contract.sector}</td>
+
                                         <td className={styles.td}>
                                             <span className={`${styles.badge} ${styles[contract.status]}`}>
                                                 {contract.status.replace('_', ' ')}

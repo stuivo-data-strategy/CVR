@@ -16,7 +16,7 @@ export default function Sidebar() {
         <aside className={styles.sidebar}>
             <div className={styles.logo}>
                 <img src="/logo.png" alt="CVR" style={{ height: '32px', width: '32px', objectFit: 'contain', marginRight: '8px' }} />
-                <span className={styles.logoText}>CVR</span>
+                <span className={styles.logoText}>Cost Value Reconciliation</span>
             </div>
             <nav className={styles.nav}>
                 {navItems.map((item) => (

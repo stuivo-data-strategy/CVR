@@ -1,13 +1,34 @@
+@import "tailwindcss";
+
 :root {
+  /* Professional Finance Palette */
   --font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   --line-height: 1.5;
   --font-weight: 400;
 
-  --color-primary: #646cff;
+  --color-primary: #0f172a;
+  /* Slate 900 */
+  --color-primary-light: #334155;
+  /* Slate 700 */
+  --color-accent: #3b82f6;
+  /* Blue 500 */
+
+  --color-success: #10b981;
+  /* Emerald 500 */
+  --color-warning: #f59e0b;
+  /* Amber 500 */
+  --color-danger: #ef4444;
+  /* Red 500 */
+
   --color-bg: #f8fafc;
+  /* Slate 50 */
   --color-surface: #ffffff;
   --color-text: #0f172a;
+  /* Slate 900 */
+  --color-text-light: #64748b;
+  /* Slate 500 */
   --color-border: #e2e8f0;
+  /* Slate 200 */
 }
 
 body {
@@ -29,11 +50,17 @@ a {
   color: var(--color-primary);
   text-decoration: none;
 }
+
 a:hover {
   text-decoration: underline;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin-top: 0;
   font-weight: 600;
 }
