@@ -16,11 +16,6 @@ import './App.css'
 const queryClient = new QueryClient()
 
 function App() {
-  const [session, setSession] = useState(null)
-
-  // In a real app we'd use a proper auth hook here
-  // For now, let's assume we might need a protected route wrapper
-
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
@@ -36,7 +31,6 @@ function App() {
             <Route path="modeling" element={<Modeling />} />
             <Route path="settings" element={<Settings />} />
             <Route path="changes" element={<ContractChanges />} />
-            {/* Add more routes as we build them */}
           </Route>
         </Routes>
       </BrowserRouter>
