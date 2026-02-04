@@ -118,8 +118,6 @@ export default function ImportContractModal({ isOpen, onClose, onSuccess }) {
                     portfolio: row['Portfolio'] || row['BU'],
                     sector: row['Sector'],
                     status: status
-                    sector: row['Sector'],
-                    status: status
                 }, { onConflict: 'contract_code' }).select().single()
 
                 if (error) {

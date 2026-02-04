@@ -30,7 +30,6 @@ export default function CreateContractModal({ open, onOpenChange }) {
                 ...formData,
                 original_value: formData.original_value ? parseFloat(formData.original_value) : 0,
                 target_margin_pct: formData.target_margin_pct ? parseFloat(formData.target_margin_pct) : 0,
-                target_margin_pct: formData.target_margin_pct ? parseFloat(formData.target_margin_pct) : 0,
                 status: 'active'
             }
         ])
