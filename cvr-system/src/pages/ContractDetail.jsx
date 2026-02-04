@@ -45,57 +45,41 @@ export default function ContractDetail() {
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-4">
-                <Link to="/contracts">
-                    <Button variant="ghost" size="sm">
-                        <ArrowLeft size={16} className="mr-2" />
-                        Back
-                    </Button>
-                </Link>
-                <div>
-                    <h1 className="text-2xl font-bold">{contract.contract_code} - {contract.name}</h1>
-                    <p className="text-gray-500">{contract.customer_name}</p>
+            <div className="flex flex-col gap-4 border-b pb-6">
+                <div className="flex items-center gap-4">
+                    <Link to="/contracts">
+                        <Button variant="ghost" size="sm">
+                            <ArrowLeft size={16} className="mr-2" />
+                            Back
+                        </Button>
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl font-bold flex items-center gap-3">
+                            {contract.contract_code} - {contract.name}
+                            <span className={`text-sm px-2 py-1 rounded-full border ${contract.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>
+                                {contract.status.replace('_', ' ')}
+                            </span>
+                        </h1>
+                        <p className="text-gray-500">{contract.customer_name} • {contract.business_unit} • {contract.sector}</p>
+                    </div>
                 </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Value</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{currencyFormatter.format(contract.original_value || 0)}</div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Target Margin</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{contract.target_margin_pct}%</div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Status</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-lg font-medium capitalize">{contract.status.replace('_', ' ')}</div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-500">Start Date</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-lg font-medium">
-                            {contract.start_date ? format(new Date(contract.start_date), 'MMM d, yyyy') : '-'}
-                        </div>
-                    </CardContent>
-                </Card>
+                <div className="flex gap-8 ml-24 bg-gray-50 p-4 rounded-lg border border-gray-100 w-fit">
+                    <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Value</p>
+                        <p className="text-xl font-bold text-gray-900">{currencyFormatter.format(contract.original_value || 0)}</p>
+                    </div>
+                    <div className="w-px bg-gray-200"></div>
+                    <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Target Margin</p>
+                        <p className="text-xl font-bold text-blue-600">{contract.target_margin_pct}%</p>
+                    </div>
+                    <div className="w-px bg-gray-200"></div>
+                    <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Start Date</p>
+                        <p className="text-lg font-medium text-gray-700">{contract.start_date ? format(new Date(contract.start_date), 'MMM d, yyyy') : '-'}</p>
+                    </div>
+                </div>
             </div>
 
             <Tabs defaultValue="financials">

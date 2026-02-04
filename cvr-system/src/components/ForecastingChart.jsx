@@ -23,7 +23,8 @@ export const ForecastingChart = ({ data }) => {
                     <Tooltip />
                     <Legend />
                     <Bar yAxisId="left" dataKey="revenue" name="Revenue" barSize={20} fill="#413ea0" />
-                    <Line yAxisId="right" type="monotone" dataKey="margin_pct" name="Margin %" stroke="#ff7300" strokeWidth={2} />
+                    <Bar yAxisId="left" dataKey="cost" name="Cost" barSize={20} fill="#f97316" />
+                    <Line yAxisId="right" type="monotone" dataKey="margin_pct" name="Margin %" stroke="#10b981" strokeWidth={2} />
                 </ComposedChart>
             </ResponsiveContainer>
         </div>

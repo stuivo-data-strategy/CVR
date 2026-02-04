@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, Filter, Search, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Plus, Filter, Search, MoreHorizontal, Trash2, Upload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import CreateContractModal from '../components/CreateContractModal'
+import ImportContractModal from '../components/ImportContractModal'
 import { format } from 'date-fns'
 import styles from './Contracts.module.css'
 
@@ -13,11 +14,15 @@ export default function Contracts() {
     const [statusFilter, setStatusFilter] = useState('all')
     const [buFilter, setBuFilter] = useState('all')
     const [sectorFilter, setSectorFilter] = useState('all')
+    const [sortField, setSortField] = useState('created_at')
+    const [sortOrder, setSortOrder] = useState('desc')
+
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false)
     const queryClient = useQueryClient()
 
     const { data: contracts, isLoading, error } = useQuery({
-        queryKey: ['contracts', statusFilter],
+        queryKey: ['contracts', statusFilter, buFilter, sectorFilter, sortField, sortOrder],
         queryFn: async () => {
             let query = supabase
                 .from('contracts')
@@ -34,7 +39,7 @@ export default function Contracts() {
             business_unit,
             sector
         `)
-                .order('created_at', { ascending: false })
+                .order(sortField, { ascending: sortOrder === 'asc' })
 
             if (statusFilter !== 'all') {
                 query = query.eq('status', statusFilter)
@@ -80,10 +85,16 @@ export default function Contracts() {
                     <h1 className={styles.title}>All Contracts</h1>
                     <p className={styles.subtitle}>Manage your portfolio and track performance.</p>
                 </div>
-                <Button onClick={() => setIsCreateModalOpen(true)}>
-                    <Plus size={16} className="mr-2" />
-                    New Contract
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+                        <Upload size={16} className="mr-2" />
+                        Import
+                    </Button>
+                    <Button onClick={() => setIsCreateModalOpen(true)}>
+                        <Plus size={16} className="mr-2" />
+                        New Contract
+                    </Button>
+                </div>
             </header>
 
             <div className={styles.controls}>
@@ -132,15 +143,37 @@ export default function Contracts() {
                     <table className={styles.table}>
                         <thead>
                             <tr>
-                                <th className={styles.th}>Code</th>
-                                <th className={styles.th}>Contract Name</th>
-                                <th className={styles.th}>Customer</th>
-                                <th className={styles.th}>BU / Sector</th>
-                                <th className={styles.th}>Status</th>
-                                <th className={styles.th}>Value</th>
-                                <th className={styles.th}>Margin %</th>
-                                <th className={styles.th}>Start Date</th>
-                                <th className={styles.th}>End Date</th>
+                                {[
+                                    { label: 'Code', field: 'contract_code' },
+                                    { label: 'Contract Name', field: 'name' },
+                                    { label: 'Customer', field: 'customer_name' },
+                                    { label: 'BU', field: 'business_unit' },
+                                    { label: 'Status', field: 'status' },
+                                    { label: 'Value', field: 'original_value' },
+                                    { label: 'Margin %', field: 'target_margin_pct' },
+                                    { label: 'Start Date', field: 'start_date' },
+                                    { label: 'End Date', field: 'end_date' },
+                                ].map((col) => (
+                                    <th
+                                        key={col.field}
+                                        className={`${styles.th} cursor-pointer hover:bg-gray-100 transition-colors select-none`}
+                                        onClick={() => {
+                                            if (sortField === col.field) {
+                                                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                                            } else {
+                                                setSortField(col.field)
+                                                setSortOrder('asc')
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            {col.label}
+                                            {sortField === col.field && (
+                                                <span className="text-xs">{sortOrder === 'asc' ? '▲' : '▼'}</span>
+                                            )}
+                                        </div>
+                                    </th>
+                                ))}
                                 <th className={styles.th}>Actions</th>
                             </tr>
                         </thead>
@@ -195,6 +228,27 @@ export default function Contracts() {
                 open={isCreateModalOpen}
                 onOpenChange={setIsCreateModalOpen}
             />
+
+            {isCreateModalOpen && (
+                <CreateContractModal
+                    onClose={() => setIsCreateModalOpen(false)}
+                    onSuccess={() => {
+                        queryClient.invalidateQueries(['contracts'])
+                        setIsCreateModalOpen(false)
+                    }}
+                />
+            )}
+
+            {isImportModalOpen && (
+                <ImportContractModal
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    onSuccess={() => {
+                        queryClient.invalidateQueries(['contracts'])
+                        setIsImportModalOpen(false)
+                    }}
+                />
+            )}
         </div>
     )
 }
