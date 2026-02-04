@@ -10,6 +10,10 @@ import ChangeLog from '../components/ChangeLog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs'
 import { ForecastingChart } from '../components/ForecastingChart'
 import { format } from 'date-fns'
+import ScenarioManager from '../components/scenarios/ScenarioManager'
+import ScenarioComparisonChart from '../components/scenarios/ScenarioComparisonChart'
+import ScenarioChangeBundler from '../components/scenarios/ScenarioChangeBundler'
+import { useScenarioForecasting } from '../hooks/useScenarioForecasting'
 
 export default function ContractDetail() {
     const { id } = useParams()
@@ -114,13 +118,48 @@ export default function ContractDetail() {
                 </TabsContent>
 
                 <TabsContent value="scenarios">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <p className="text-gray-500">Scenario modelling module not yet implemented.</p>
-                        </CardContent>
-                    </Card>
+                    <ScenarioModule contractId={id} />
                 </TabsContent>
             </Tabs>
+        </div>
+    )
+}
+
+function ScenarioModule({ contractId }) {
+    const [selectedScenarioId, setSelectedScenarioId] = React.useState(null)
+    const { data: forecastData, isLoading } = useScenarioForecasting(contractId, selectedScenarioId)
+
+    // Dynamically load hook to avoid circular dep issues in this single-file edit if they were in same file
+    // But since they are imported, we need to add imports at top. 
+    // For this Replace, I will assume imports are added. 
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="col-span-1">
+                <ScenarioManager
+                    contractId={contractId}
+                    selectedScenarioId={selectedScenarioId}
+                    onScenarioSelect={setSelectedScenarioId}
+                />
+            </div>
+            <div className="md:col-span-3 flex flex-col gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Scenario Impact Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {isLoading ? (
+                            <div>Loading Analysis...</div>
+                        ) : (
+                            <ScenarioComparisonChart data={forecastData} />
+                        )}
+                    </CardContent>
+                </Card>
+
+                {selectedScenarioId && (
+                    <ScenarioChangeBundler contractId={contractId} scenarioId={selectedScenarioId} />
+                )}
+            </div>
         </div>
     )
 }
