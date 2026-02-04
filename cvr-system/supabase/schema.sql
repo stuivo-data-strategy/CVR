@@ -1,4 +1,4 @@
--- CVR System Schema (No RLS)
+-- CVR System Schema (No RLS) - v2
 
 -- 1. AUTHENTICATION & PROFILES
 create type public.user_role as enum ('admin', 'bu_manager', 'contract_owner', 'viewer');
@@ -80,13 +80,23 @@ create table public.contract_revenue (
 );
 
 create type public.cost_type as enum ('baseline', 'actual', 'forecast');
-create type public.cost_category as enum ('accruals', 'internal_billings', 'subcontract_valuations', 'agency', 'labour', 'expenses', 'other');
+
+-- NEW: Cost Categories Table
+create table public.cost_categories (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  name text not null,
+  description text,
+  group_name text,
+  is_active boolean default true,
+  sort_order integer
+);
 
 create table public.contract_costs (
   id uuid primary key default gen_random_uuid(),
   contract_period_id uuid references public.contract_periods(id) on delete cascade,
   cost_type public.cost_type not null,
-  category public.cost_category not null,
+  category_id uuid references public.cost_categories(id),
   amount numeric default 0
 );
 
@@ -110,7 +120,7 @@ select
 from public.contract_revenue
 group by contract_period_id, revenue_type;
 
--- Contract Monthly Summary View (simplified logic for robustness - assumes 1 period row per month/version logic handled by app)
+-- Contract Monthly Summary View
 create or replace view public.contract_monthly_summary_view as
 select
     cp.contract_id,
@@ -134,8 +144,18 @@ create table public.contract_changes (
   id uuid primary key default gen_random_uuid(),
   contract_id uuid references public.contracts(id) on delete cascade,
   change_code text,
+  title text, -- NEW
   description text,
+  reason_for_change text, -- NEW
+  customer_reference text, -- NEW
+  commercial_owner uuid references public.profiles(id), -- NEW
+  technical_owner uuid references public.profiles(id), -- NEW
+  customer_contact text, -- NEW
   effective_date date,
+  applies_from_period date, -- NEW
+  applies_to_period date, -- NEW
+  is_retrospective boolean default false, -- NEW
+  requires_rebaseline boolean default false, -- NEW
   change_type public.change_type,
   customer_share_pct numeric default 0,
   company_share_pct numeric default 100,
@@ -144,6 +164,10 @@ create table public.contract_changes (
   anticipated_disallowed_cost numeric default 0,
   conversion_probability_pct numeric default 100,
   status public.change_status default 'proposed',
+  customer_approval_received boolean default false, -- NEW
+  approval_date date, -- NEW
+  commercial_approval_by uuid references public.profiles(id), -- NEW
+  technical_approval_by uuid references public.profiles(id), -- NEW
   risk_level public.risk_level default 'low',
   tags text[],
   created_by uuid references public.profiles(id),
@@ -156,7 +180,7 @@ create table public.contract_change_impacts (
   period_month date not null,
   revenue_delta numeric default 0,
   cost_delta numeric default 0,
-  cost_category public.cost_category,
+  cost_category_id uuid references public.cost_categories(id), -- NEW FK
   is_scenario_only boolean default false
 );
 
@@ -191,7 +215,6 @@ create table public.contract_forecast_factors (
 );
 
 -- 8. MONTHLY SUMMARY FUNCTION
--- Returns comprehensive JSON summary for AI
 create or replace function public.get_contract_monthly_summary(p_contract_id uuid, p_period_month date)
 returns json as $$
 declare

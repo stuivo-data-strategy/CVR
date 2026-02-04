@@ -1,148 +1,213 @@
-.contract-change-form-overlay {
+/* ContractChangeForm.css */
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
 }
 
-.ccr-modal-content {
-    background: var(--bg-card, #fff); /* Fallback to white if var invalid */
-    width: 90%;
-    max-width: 1000px;
-    height: 90vh;
+.modal-container {
+    background-color: white;
+    width: 900px;
+    max-width: 95vw;
+    height: 85vh;
     border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    color: var(--text-primary, #333);
 }
 
-.form-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border-subtle, #eee);
+.modal-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--bg-secondary, #f8f9fa);
+    background-color: #f8fafc;
 }
 
-.form-header h2 {
+.modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1e293b;
     margin: 0;
-    font-size: 1.5rem;
 }
 
-.btn-close {
-    background: none;
-    border: none;
-    font-size: 2rem;
-    cursor: pointer;
-    color: var(--text-secondary, #666);
-}
-
-.ccr-form {
-    padding: 1.5rem;
-    overflow-y: auto;
+.modal-body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    overflow: hidden;
 }
 
-.form-section {
-    border: 1px solid var(--border-subtle, #eee);
-    border-radius: 8px;
-    padding: 1rem;
-    background: var(--bg-primary, #fff);
-}
-
-.form-section legend {
-    font-weight: 600;
-    padding: 0 0.5rem;
-    color: var(--accent-primary, #007bff);
-}
-
-.form-row {
+.tab-nav {
     display: flex;
-    gap: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    background-color: white;
+    padding: 0 1rem;
+}
+
+.tab-btn {
+    padding: 1rem 1.5rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #64748b;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.tab-btn:hover {
+    color: #1e293b;
+}
+
+.tab-btn.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+}
+
+.tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    background-color: #fff;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
     margin-bottom: 1rem;
-    flex-wrap: wrap; /* Safety for small screens */
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.subsection-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 0.5rem;
 }
 
 .form-group {
-    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    min-width: 200px;
+    gap: 0.25rem;
 }
 
 .form-group label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    color: var(--text-secondary, #555);
+    color: #475569;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
     padding: 0.5rem;
-    border: 1px solid var(--border-subtle, #ccc);
+    border: 1px solid #cbd5e1;
     border-radius: 4px;
-    background: var(--bg-input, #fff);
-    color: var(--text-primary, #000);
+    font-size: 0.9rem;
 }
 
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: auto;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-subtle, #eee);
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-.text-danger {
-    color: #ff6b6b;
+.mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
 }
 
-.text-success {
-    color: #51cf66;
-}
-
-/* Button styles matching project likely conventions or generic fallbacks */
-.btn {
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    border: none;
+.mini-table th {
+    text-align: left;
+    padding: 0.5rem;
+    background-color: #f1f5f9;
+    color: #64748b;
     font-weight: 500;
 }
 
-.btn-primary {
-    background: var(--accent-primary, #007bff);
-    color: white;
+.mini-table td {
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-.btn-secondary {
-    background: var(--bg-secondary, #e9ecef);
-    color: var(--text-primary, #333);
-}
-
-.contract-change-form-overlay table {
+.mini-table input,
+.mini-table select {
     width: 100%;
-    border-collapse: collapse;
+    padding: 0.25rem;
+    border: 1px solid transparent;
+    border-radius: 2px;
 }
 
-.contract-change-form-overlay th, 
-.contract-change-form-overlay td {
-    padding: 0.5rem;
-    border: 1px solid var(--border-subtle, #eee);
-    text-align: left;
+.mini-table input:hover,
+.mini-table select:hover {
+    border-color: #cbd5e1;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    background-color: #f8fafc;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #64748b;
+}
+
+.btn-xs {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.btn-outline {
+    border: 1px solid #cbd5e1;
+    background: white;
+    border-radius: 4px;
+}
+
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-success {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.input-icon-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 0.5rem;
+    color: #94a3b8;
+}
+
+.input-icon-wrapper input {
+    padding-left: 2rem;
 }

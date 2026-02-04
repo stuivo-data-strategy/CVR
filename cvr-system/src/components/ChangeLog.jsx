@@ -3,22 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { Button } from './ui/Button'
 import { Plus, Trash2 } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/Dialog'
+import { ContractChangeForm } from './ContractChangeForm'
 import { format } from 'date-fns'
 import styles from './ChangeLog.module.css'
 
 export default function ChangeLog({ contractId }) {
     const queryClient = useQueryClient()
     const [isModalOpen, setIsModalOpen] = useState(false)
-    const [formData, setFormData] = useState({
-        change_code: '',
-        description: '',
-        effective_date: '',
-        revenue_delta: '',
-        cost_delta: '',
-        change_type: 'scope_addition',
-        status: 'proposed'
-    })
 
     const { data: changes, isLoading } = useQuery({
         queryKey: ['changes', contractId],
@@ -32,35 +23,6 @@ export default function ChangeLog({ contractId }) {
             return data
         }
     })
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value })
-    }
-
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-        const { error } = await supabase.from('contract_changes').insert({
-            ...formData,
-            contract_id: contractId,
-            revenue_delta: parseFloat(formData.revenue_delta) || 0,
-            cost_delta: parseFloat(formData.cost_delta) || 0
-        })
-
-        if (error) alert(error.message)
-        else {
-            setIsModalOpen(false)
-            queryClient.invalidateQueries(['changes', contractId])
-            setFormData({
-                change_code: '',
-                description: '',
-                effective_date: '',
-                revenue_delta: '',
-                cost_delta: '',
-                change_type: 'scope_addition',
-                status: 'proposed'
-            })
-        }
-    }
 
     const handleDelete = async (id) => {
         if (!confirm('Delete change?')) return
@@ -119,43 +81,15 @@ export default function ChangeLog({ contractId }) {
                 </table>
             </div>
 
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogHeader><DialogTitle>Add Contract Change</DialogTitle></DialogHeader>
-                <form onSubmit={handleSubmit} className={styles.form}>
-                    <DialogContent>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">Code</label>
-                                <input className={styles.input} name="change_code" value={formData.change_code} onChange={handleChange} required />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">Type</label>
-                                <select className={styles.input} name="change_type" value={formData.change_type} onChange={handleChange}>
-                                    <option value="scope_addition">Scope Addition</option>
-                                    <option value="scope_reduction">Scope Reduction</option>
-                                    <option value="rate_change">Rate Change</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                            <div className="flex flex-col gap-2 col-span-2">
-                                <label className="text-sm font-medium">Description</label>
-                                <input className={styles.input} name="description" value={formData.description} onChange={handleChange} required />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">Rev. Delta</label>
-                                <input className={styles.input} type="number" name="revenue_delta" value={formData.revenue_delta} onChange={handleChange} />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">Cost Delta</label>
-                                <input className={styles.input} type="number" name="cost_delta" value={formData.cost_delta} onChange={handleChange} />
-                            </div>
-                        </div>
-                    </DialogContent>
-                    <DialogFooter>
-                        <Button type="submit">Save Change</Button>
-                    </DialogFooter>
-                </form>
-            </Dialog>
+            {isModalOpen && (
+                <ContractChangeForm
+                    contractId={contractId}
+                    onClose={() => setIsModalOpen(false)}
+                    onSuccess={() => {
+                        queryClient.invalidateQueries(['changes', contractId])
+                    }}
+                />
+            )}
         </div>
     )
 }

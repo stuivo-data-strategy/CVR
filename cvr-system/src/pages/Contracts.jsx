@@ -11,6 +11,8 @@ import styles from './Contracts.module.css'
 
 export default function Contracts() {
     const [statusFilter, setStatusFilter] = useState('all')
+    const [buFilter, setBuFilter] = useState('all')
+    const [sectorFilter, setSectorFilter] = useState('all')
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const queryClient = useQueryClient()
 
@@ -28,12 +30,20 @@ export default function Contracts() {
             original_value, 
             target_margin_pct,
             start_date,
-            end_date
+            end_date,
+            business_unit,
+            sector
         `)
                 .order('created_at', { ascending: false })
 
             if (statusFilter !== 'all') {
                 query = query.eq('status', statusFilter)
+            }
+            if (buFilter !== 'all') {
+                query = query.eq('business_unit', buFilter)
+            }
+            if (sectorFilter !== 'all') {
+                query = query.eq('sector', sectorFilter)
             }
 
             const { data, error } = await query
@@ -87,16 +97,33 @@ export default function Contracts() {
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
-                        <option value="all">All Statuses</option>
+                        <option value="all">Status: All</option>
                         <option value="active">Active</option>
                         <option value="on_hold">On Hold</option>
                         <option value="completed">Completed</option>
                         <option value="terminated">Terminated</option>
                     </select>
-                    <Button variant="outline">
-                        <Filter size={16} className="mr-2" />
-                        More Filters
-                    </Button>
+                    <select
+                        className={styles.select}
+                        value={buFilter}
+                        onChange={(e) => setBuFilter(e.target.value)}
+                    >
+                        <option value="all">BU: All</option>
+                        <option value="Construction">Construction</option>
+                        <option value="Infrastructure">Infrastructure</option>
+                        <option value="Services">Services</option>
+                    </select>
+                    <select
+                        className={styles.select}
+                        value={sectorFilter}
+                        onChange={(e) => setSectorFilter(e.target.value)}
+                    >
+                        <option value="all">Sector: All</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Public">Public</option>
+                        <option value="Residential">Residential</option>
+                        <option value="Industrial">Industrial</option>
+                    </select>
                 </div>
             </div>
 
@@ -108,6 +135,7 @@ export default function Contracts() {
                                 <th className={styles.th}>Code</th>
                                 <th className={styles.th}>Contract Name</th>
                                 <th className={styles.th}>Customer</th>
+                                <th className={styles.th}>BU / Sector</th>
                                 <th className={styles.th}>Status</th>
                                 <th className={styles.th}>Value</th>
                                 <th className={styles.th}>Margin %</th>
@@ -135,6 +163,12 @@ export default function Contracts() {
                                             <span className="font-medium">{contract.name}</span>
                                         </td>
                                         <td className={styles.td}>{contract.customer_name}</td>
+                                        <td className={styles.td}>
+                                            <div className="flex flex-col text-xs">
+                                                <span className="font-medium">{contract.business_unit || '-'}</span>
+                                                <span className="text-gray-500">{contract.sector || '-'}</span>
+                                            </div>
+                                        </td>
                                         <td className={styles.td}>
                                             <span className={`${styles.badge} ${styles[contract.status]}`}>
                                                 {contract.status.replace('_', ' ')}

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import FinancialsGrid from '../components/FinancialsGrid'
 import ChangeLog from '../components/ChangeLog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs'
+import { ForecastingChart } from '../components/ForecastingChart'
 import { format } from 'date-fns'
 
 export default function ContractDetail() {
@@ -16,13 +17,19 @@ export default function ContractDetail() {
     const { data: contract, isLoading } = useQuery({
         queryKey: ['contract', id],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('contracts')
-                .select('*')
-                .eq('id', id)
-                .single()
-
+            const { data, error } = await supabase.from('contracts').select('*').eq('id', id).single()
             if (error) throw error
+            return data
+        }
+    })
+
+    const { data: financials } = useQuery({
+        queryKey: ['financials', id],
+        queryFn: async () => {
+            const { data } = await supabase.from('contract_monthly_summary_view')
+                .select('*')
+                .eq('contract_id', id)
+                .order('period_month', { ascending: true })
             return data
         }
     })
@@ -104,6 +111,11 @@ export default function ContractDetail() {
                             <CardTitle>Financial Performance</CardTitle>
                         </CardHeader>
                         <CardContent>
+                            {financials && financials.length > 0 && (
+                                <div className="mb-8 border p-4 rounded bg-gray-50">
+                                    <ForecastingChart data={financials} />
+                                </div>
+                            )}
                             <FinancialsGrid contractId={id} />
                         </CardContent>
                     </Card>
