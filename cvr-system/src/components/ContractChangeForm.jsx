@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { Plus, Trash2, Calendar, DollarSign, Calculator } from 'lucide-react'
-import './ContractChangeForm.css'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/Dialog'
+import { Button } from './ui/Button'
+import { AlertDialog } from './ui/AlertDialog'
+import { Plus, Trash2, Calendar, DollarSign, Calculator, AlertCircle } from 'lucide-react'
+import './ContractChangeForm.css' // Restored for layout styles
 
 // Simple UUID generator fallback
 const generateId = () => {
@@ -60,6 +63,8 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     const [costCategories, setCostCategories] = useState([])
     const [profiles, setProfiles] = useState([])
     const [activeTab, setActiveTab] = useState('identification') // identification, financial, forecasting, governance
+    const [alertConfig, setAlertConfig] = useState({ open: false, title: '', description: '', onConfirm: null, variant: 'primary' })
+    const [error, setError] = useState(null)
 
     useEffect(() => {
         const fetchRefData = async () => {
@@ -156,8 +161,28 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
 
             // Warnings (soft validation)
             if (Math.abs(sumImpactRev - formData.revenue_delta) > 1) {
-                if (!confirm(`Warning: Time-phased revenue (${sumImpactRev}) does not match headline revenue (${formData.revenue_delta}). Continue?`)) return
+                // Modern Confirm Dialog
+                setAlertConfig({
+                    open: true,
+                    title: 'Revenue Mismatch',
+                    description: `Time-phased revenue (${sumImpactRev.toFixed(2)}) does not match headline revenue (${formData.revenue_delta.toFixed(2)}). Continue anyway?`,
+                    variant: 'warning',
+                    confirmText: 'Continue',
+                    onConfirm: () => submitData(formData) // Proceed
+                })
+                return
             }
+
+            await submitData(formData)
+
+        } catch (err) {
+            console.error(err)
+            setError(err.message)
+        }
+    }
+
+    const submitData = async (data) => {
+        try {
 
             // 2. Upsert Contract Change
             // Exclude arrays 'cost_breakdown' and 'impacts' from the insert object for the main table
@@ -244,12 +269,14 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
 
             onSuccess()
             onClose()
-
         } catch (err) {
             console.error(err)
-            alert('Error saving change: ' + err.message)
+            setError('Error saving change: ' + err.message)
         }
     }
+
+    // Constant Styles
+    const selectClass = "w-full border p-2 rounded bg-white"
 
     // --- RENDERERS ---
     const renderNav = () => (
@@ -309,17 +336,17 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
             </div>
 
             <h4 className="subsection-title mt-4">Ownership</h4>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
                 <div className="form-group">
                     <label>Commercial Owner</label>
-                    <select value={formData.commercial_owner} onChange={e => handleChange('commercial_owner', e.target.value)}>
+                    <select value={formData.commercial_owner} onChange={e => handleChange('commercial_owner', e.target.value)} className={selectClass}>
                         <option value="">Select...</option>
                         {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
                     </select>
                 </div>
                 <div className="form-group">
                     <label>Technical Owner</label>
-                    <select value={formData.technical_owner} onChange={e => handleChange('technical_owner', e.target.value)}>
+                    <select value={formData.technical_owner} onChange={e => handleChange('technical_owner', e.target.value)} className={selectClass}>
                         <option value="">Select...</option>
                         {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
                     </select>
@@ -523,40 +550,54 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     )
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-container">
-                <div className="modal-header">
-                    <h2>Contract Change Request (CCR)</h2>
-                    <div className="flex gap-2">
-                        {formData.status === 'approved' && <span className="badge badge-success">Approved</span>}
-                        <button onClick={onClose} className="btn-close">×</button>
-                    </div>
-                </div>
+        <Dialog open={true} onOpenChange={onClose} className="max-w-5xl">
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+                <DialogHeader className="px-6 py-4 border-b">
+                    <DialogTitle className="flex justify-between items-center">
+                        <span>Contract Change Request (CCR)</span>
+                        {formData.status === 'approved' && <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Approved</span>}
+                    </DialogTitle>
+                </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
+                            <AlertCircle size={16} /> {error}
+                            <button onClick={() => setError(null)} className="ml-auto text-sm underline">Dismiss</button>
+                        </div>
+                    )}
+
                     {renderNav()}
 
-                    <div className="tab-content">
+                    <div className="tab-content mt-4">
                         {activeTab === 'identification' && renderIdentification()}
                         {activeTab === 'financial' && renderFinancial()}
                         {activeTab === 'forecasting' && <div className="p-4">Forecasting options included in Governance tab for now. <button type="button" className="text-blue-600 underline" onClick={() => setActiveTab('governance')}>Go to Governance</button></div>}
                         {activeTab === 'governance' && renderGovernance()}
                     </div>
+                </div>
 
-                    <div className="modal-footer">
-                        <div className="flex justify-between w-full">
-                            <div className="text-xs text-gray-500 flex flex-col justify-center">
-                                <span>Total Revenue: {formData.revenue_delta}</span>
-                                <span>Total Cost: {formData.cost_delta}</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
-                                <button type="submit" className="btn btn-primary">Save Change Request</button>
-                            </div>
-                        </div>
+                <DialogFooter className="px-6 py-4 border-t bg-gray-50 flex justify-between items-center sm:justify-between">
+                    <div className="text-xs text-gray-500 flex flex-col">
+                        <span>Total Revenue: {formData.revenue_delta?.toFixed(2)}</span>
+                        <span>Total Cost: {formData.cost_delta?.toFixed(2)}</span>
                     </div>
-                </form>
-            </div>
-        </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button onClick={handleSubmit}>Save Change Request</Button>
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+
+            <AlertDialog
+                open={alertConfig.open}
+                onOpenChange={(val) => setAlertConfig(prev => ({ ...prev, open: val }))}
+                title={alertConfig.title}
+                description={alertConfig.description}
+                onConfirm={alertConfig.onConfirm}
+                variant={alertConfig.variant}
+                confirmText={alertConfig.confirmText}
+            />
+        </Dialog>
     )
 }

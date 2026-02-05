@@ -43,5 +43,7 @@ export function TabsTrigger({ value, children, className, isActive, onClick, ...
 
 export function TabsContent({ value, children, className, activeTab, ...props }) {
     if (value !== activeTab) return null
-    return <div className={cn(styles.content, className)} {...props}>{children}</div>
+    // Filter out setActiveTab from props before passing to div
+    const { setActiveTab, ...domProps } = props
+    return <div className={cn(styles.content, className)} {...domProps}>{children}</div>
 }

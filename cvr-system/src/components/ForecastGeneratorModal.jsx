@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { Calculator, TrendingUp, ArrowRight } from 'lucide-react'
 import { addMonths, format, parseISO } from 'date-fns'
+import { AlertDialog } from './ui/AlertDialog'
 
 export default function ForecastGeneratorModal({ isOpen, onClose, contractId, categories, periods }) {
     const queryClient = useQueryClient()
@@ -13,6 +14,7 @@ export default function ForecastGeneratorModal({ isOpen, onClose, contractId, ca
     const [targetCategory, setTargetCategory] = useState('ALL') // 'ALL' or specific category ID
     const [totalValue, setTotalValue] = useState('') // For CTC
     const [loading, setLoading] = useState(false)
+    const [alertConfig, setAlertConfig] = useState({ open: false, title: '', description: '', variant: 'primary' })
 
     // Helper: Sort periods
     const sortedPeriods = [...(periods || [])].sort((a, b) => new Date(a.period_month) - new Date(b.period_month))
@@ -114,10 +116,24 @@ export default function ForecastGeneratorModal({ isOpen, onClose, contractId, ca
             await queryClient.invalidateQueries({ queryKey: ['forecasting_periods', contractId] })
             await queryClient.invalidateQueries({ queryKey: ['financials', contractId] })
 
-            onClose()
-            alert(`Successfully applied forecast of ${monthlyAmount.toFixed(2)} / month.`)
+            // Success Alert (Close parent only after acknowledgement)
+            setAlertConfig({
+                open: true,
+                title: 'Forecast Applied',
+                description: `Successfully applied forecast of ${monthlyAmount.toFixed(2)} / month.`,
+                variant: 'primary',
+                onConfirm: () => {
+                    setAlertConfig(prev => ({ ...prev, open: false }))
+                    onClose()
+                }
+            })
         } catch (err) {
-            alert(err.message)
+            setAlertConfig({
+                open: true,
+                title: 'Error',
+                description: err.message,
+                variant: 'destructive'
+            })
         } finally {
             setLoading(false)
         }
@@ -213,6 +229,16 @@ export default function ForecastGeneratorModal({ isOpen, onClose, contractId, ca
                     {loading ? 'Applying...' : 'Apply Forecast'}
                 </Button>
             </DialogFooter>
+
+            <AlertDialog
+                open={alertConfig.open}
+                onOpenChange={(val) => setAlertConfig(prev => ({ ...prev, open: val }))}
+                title={alertConfig.title}
+                description={alertConfig.description}
+                variant={alertConfig.variant}
+                confirmText="OK"
+                cancelText=""
+            />
         </Dialog>
     )
 }

@@ -8,13 +8,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 50;
+    z-index: 1000;
     backdrop-filter: blur(4px);
     animation: fadeIn 0.2s ease-out;
 }
 
 .dialog {
-    background-color: var(--color-surface);
+    background-color: white;
+    /* var(--color-surface) backup */
     border-radius: 0.75rem;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     width: 100%;

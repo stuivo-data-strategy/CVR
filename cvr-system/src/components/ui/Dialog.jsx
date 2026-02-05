@@ -4,12 +4,12 @@ import styles from './Dialog.module.css'
 import { cn } from '../../lib/utils'
 import { createPortal } from 'react-dom'
 
-export function Dialog({ open, onOpenChange, children }) {
+export function Dialog({ open, onOpenChange, children, className }) {
     if (!open) return null
 
     return createPortal(
         <div className={styles.overlay} onClick={() => onOpenChange(false)}>
-            <div className={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div className={cn(styles.dialog, className)} onClick={e => e.stopPropagation()}>
                 {children}
                 <button className={styles.closeButton} onClick={() => onOpenChange(false)}>
                     <X size={20} />

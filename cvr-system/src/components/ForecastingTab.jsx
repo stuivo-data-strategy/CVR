@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Button } from './ui/Button'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/Card'
 import { Wand2, AlertTriangle, Calendar } from 'lucide-react'
+import { AlertDialog } from './ui/AlertDialog'
 
 import ForecastGeneratorModal from './ForecastGeneratorModal'
 import ForecastingGrid from './ForecastingGrid'
@@ -13,6 +14,7 @@ export default function ForecastingTab({ contractId }) {
     const [isCleaning, setIsCleaning] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
     const [cutoffDate, setCutoffDate] = useState(new Date().toISOString().slice(0, 7) + '-01') // Default to 1st of current month
+    const [alertConfig, setAlertConfig] = useState({ open: false, title: '', description: '', variant: 'primary', onConfirm: null })
 
     // Fetch periods for the modal to know what's future
     const { data: periods } = useQueryClient().getQueryData(['forecasting_periods', contractId])?.periods || { data: [] }
@@ -21,9 +23,18 @@ export default function ForecastingTab({ contractId }) {
     // Let's refactor: ForecastingGrid fetches data. We might need to lift that state or just refetch in modal.
     // Modal refetch is safer.
 
-    const handleCleanup = async () => {
-        if (!confirm(`Are you sure? \n\nThis will mark all periods BEFORE or ON ${cutoffDate} as ACTUALS, and all periods AFTER as FORECAST.`)) return
+    const confirmCleanup = () => {
+        setAlertConfig({
+            open: true,
+            title: 'Split Actuals vs Forecast',
+            description: `Are you sure? This will mark all periods BEFORE or ON ${cutoffDate} as ACTUALS, and all periods AFTER as FORECAST. This cannot be easily undone.`,
+            variant: 'destructive',
+            confirmText: 'Yes, Split Data',
+            onConfirm: performCleanup
+        })
+    }
 
+    const performCleanup = async () => {
         setIsCleaning(true)
         try {
             const { error } = await supabase.rpc('split_actuals_forecast', {
@@ -33,13 +44,29 @@ export default function ForecastingTab({ contractId }) {
 
             if (error) throw error
 
-            alert('Data successfully split into Actuals vs Forecast.')
+            setAlertConfig({
+                open: true,
+                title: 'Success',
+                description: 'Data successfully split into Actuals vs Forecast.',
+                variant: 'primary',
+                confirmText: 'OK',
+                cancelText: '', // Hide cancel button
+                onConfirm: null
+            })
+
             queryClient.invalidateQueries(['contract_summary', contractId])
             queryClient.invalidateQueries(['financials', contractId])
             queryClient.invalidateQueries(['forecasting_periods', contractId])
 
         } catch (err) {
-            alert('Error running cleanup: ' + err.message)
+            setAlertConfig({
+                open: true,
+                title: 'Error',
+                description: 'Error running cleanup: ' + err.message,
+                variant: 'destructive',
+                confirmText: 'Close',
+                cancelText: ''
+            })
         } finally {
             setIsCleaning(false)
         }
@@ -77,7 +104,7 @@ export default function ForecastingTab({ contractId }) {
                                 </div>
                             </div>
                             <Button
-                                onClick={handleCleanup}
+                                onClick={confirmCleanup}
                                 disabled={isCleaning}
                                 variant="outline"
                                 className="bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
@@ -110,6 +137,17 @@ export default function ForecastingTab({ contractId }) {
                 // We'll let it fetch its own data for simplicity in this turn
                 periods={queryClient.getQueryData(['forecasting_periods', contractId])}
                 categories={queryClient.getQueryData(['cost_categories'])}
+            />
+
+            <AlertDialog
+                open={alertConfig.open}
+                onOpenChange={(val) => setAlertConfig(prev => ({ ...prev, open: val }))}
+                title={alertConfig.title}
+                description={alertConfig.description}
+                variant={alertConfig.variant}
+                confirmText={alertConfig.confirmText}
+                cancelText={alertConfig.cancelText}
+                onConfirm={alertConfig.onConfirm}
             />
         </div>
     )
