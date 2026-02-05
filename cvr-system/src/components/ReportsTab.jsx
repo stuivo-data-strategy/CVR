@@ -108,37 +108,81 @@ export default function ReportsTab({ contractId }) {
                         Dots indicate significant events (Narratives or Contract Changes).
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="h-[400px]">
+                <CardContent className="h-[500px]">
                     <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                        <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 30, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                             <XAxis dataKey="displayDate" tick={{ fontSize: 12 }} />
+
+                            {/* Left Axis: Currency */}
                             <YAxis
-                                domain={['auto', 'auto']}
-                                tickFormatter={(val) => `${val}%`}
-                                width={50}
+                                yAxisId="left"
+                                orientation="left"
+                                tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
+                                width={60}
+                                stroke="#6b7280"
                             />
+
+                            {/* Right Axis: Percentage */}
+                            <YAxis
+                                yAxisId="right"
+                                orientation="right"
+                                domain={['auto', 'auto']}
+                                tickFormatter={(val) => `${val.toFixed(0)}%`}
+                                width={50}
+                                stroke="#2563eb"
+                            />
+
                             <Tooltip content={<CustomTooltip />} />
                             <Legend />
 
-                            {/* Target Line */}
+                            {/* Reference Lines */}
                             {contract?.target_margin_pct && (
-                                <ReferenceLine y={contract.target_margin_pct} stroke="green" strokeDasharray="3 3" label={{ value: 'Target', position: 'insideRight', fill: 'green', fontSize: 10 }} />
+                                <ReferenceLine yAxisId="right" y={contract.target_margin_pct} stroke="green" strokeDasharray="3 3" label={{ value: 'Target', position: 'insideRight', fill: 'green', fontSize: 10 }} />
                             )}
 
-                            {/* Main Margin Line */}
+                            {/* Bars for Cost & Revenue (Left Axis) */}
+                            <Area
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="cum_cost"
+                                name="Cumulative Cost"
+                                fill="#f3f4f6"
+                                stroke="#9ca3af"
+                                fillOpacity={0.6}
+                            />
+
+                            {/* Revenue Bar - using Area for smoother visualization below line? Or Bar? User asked for "values". Let's use Bar for clearer distinction or Line? 
+                                User asked for "Actuals and Forecast Values". Multi-bar might be messy. 
+                                Let's use Line for Margin % (Right) and Area/Bar for Revenue/Cost. 
+                                Area stacking? No, Revenue and Cost are separate totals. 
+                                Let's use darker Area for Revenue to contrast with Cost.
+                            */}
+                            <Area
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="cum_revenue"
+                                name="Cumulative Revenue"
+                                fill="#dbeafe"
+                                stroke="#93c5fd"
+                                fillOpacity={0.4}
+                            />
+
+                            {/* Margin Line (Right Axis) */}
                             <Line
+                                yAxisId="right"
                                 type="monotone"
                                 dataKey="cum_margin_pct"
-                                name="Cumulative Margin %"
+                                name="Margin %"
                                 stroke="#2563eb"
-                                strokeWidth={2}
+                                strokeWidth={3}
                                 dot={false}
                                 activeDot={{ r: 6 }}
                             />
 
-                            {/* Event Markers (Scatter) */}
+                            {/* Event Markers (Scatter) - Right Axis aligned */}
                             <Scatter
+                                yAxisId="right"
                                 name="Events"
                                 dataKey="hasEvent"
                                 fill="#f59e0b"

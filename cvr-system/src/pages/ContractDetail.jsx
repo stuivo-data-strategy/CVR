@@ -93,6 +93,7 @@ export default function ContractDetail() {
                     <TabsTrigger value="financials">Monthly Financials</TabsTrigger>
                     <TabsTrigger value="changes">Change Log</TabsTrigger>
                     <TabsTrigger value="forecasting">Forecasting</TabsTrigger>
+                    <TabsTrigger value="reports">Reports & Analysis</TabsTrigger>
                     <TabsTrigger value="scenarios">What-If Scenarios</TabsTrigger>
                 </TabsList>
 
@@ -139,10 +140,6 @@ export default function ContractDetail() {
 function ScenarioModule({ contractId }) {
     const [selectedScenarioId, setSelectedScenarioId] = React.useState(null)
     const { data: forecastData, isLoading } = useScenarioForecasting(contractId, selectedScenarioId)
-
-    // Dynamically load hook to avoid circular dep issues in this single-file edit if they were in same file
-    // But since they are imported, we need to add imports at top. 
-    // For this Replace, I will assume imports are added. 
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
