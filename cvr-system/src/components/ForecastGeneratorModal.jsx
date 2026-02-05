@@ -17,14 +17,25 @@ export default function ForecastGeneratorModal({ isOpen, onClose, contractId, ca
     // Helper: Sort periods
     const sortedPeriods = [...(periods || [])].sort((a, b) => new Date(a.period_month) - new Date(b.period_month))
 
+    // Helper: Find Active Record (Actual or Forecast)
+    const getActive = (records, typeField) => records?.find(r => r[typeField] === 'actual' || r[typeField] === 'forecast')
+
     // Helper: Get future periods (Forecast)
-    const futurePeriods = sortedPeriods.filter(p => p.contract_revenue?.[0]?.revenue_type !== 'actual')
+    const futurePeriods = sortedPeriods.filter(p => {
+        const rev = getActive(p.contract_revenue, 'revenue_type')
+        // If Actual, it's past. If Forecast or Missing, it's future.
+        return rev?.revenue_type !== 'actual'
+    })
     const countFuture = futurePeriods.length
 
     // Helper: Calculate Run Rate (Average of last 3 actuals)
     const calculateRunRate = () => {
         // Find actuals
-        const actuals = sortedPeriods.filter(p => p.contract_revenue?.[0]?.revenue_type === 'actual')
+        const actuals = sortedPeriods.filter(p => {
+            const rev = getActive(p.contract_revenue, 'revenue_type')
+            return rev?.revenue_type === 'actual'
+        })
+
         // Take last 3
         const last3 = actuals.slice(-3)
         if (last3.length === 0) return 0
@@ -32,9 +43,12 @@ export default function ForecastGeneratorModal({ isOpen, onClose, contractId, ca
         const sum = last3.reduce((acc, p) => {
             let val = 0
             if (targetCategory === 'REVENUE') {
-                val = p.contract_revenue?.[0]?.amount || 0
+                const r = getActive(p.contract_revenue, 'revenue_type')
+                val = r?.amount || 0
             } else if (targetCategory !== 'ALL') {
-                val = p.contract_costs?.find(c => c.category_id === targetCategory)?.amount || 0
+                const costs = p.contract_costs?.filter(c => c.category_id === targetCategory)
+                const c = getActive(costs, 'cost_type')
+                val = c?.amount || 0
             }
             return acc + val
         }, 0)
@@ -60,31 +74,46 @@ export default function ForecastGeneratorModal({ isOpen, onClose, contractId, ca
             }
 
             // Apply to DB
+            let successCount = 0
             for (const p of futurePeriods) {
                 if (targetCategory === 'REVENUE') {
-                    await supabase.from('contract_revenue').upsert({
+                    // Update Revenue: Delete existing forecast and insert new
+                    const { error: delErr } = await supabase.from('contract_revenue').delete()
+                        .eq('contract_period_id', p.id)
+                        .eq('revenue_type', 'forecast')
+
+                    if (delErr) throw delErr
+
+                    const { error: insErr } = await supabase.from('contract_revenue').insert({
                         contract_period_id: p.id,
                         revenue_type: 'forecast',
                         amount: monthlyAmount
-                    }, { onConflict: 'contract_period_id, revenue_type' })
+                    })
+
+                    if (insErr) throw insErr
+
                 } else if (targetCategory !== 'ALL') {
                     // Specific Cost Category
-                    await supabase.from('contract_costs').delete()
+                    const { error: delErr } = await supabase.from('contract_costs').delete()
                         .eq('contract_period_id', p.id)
                         .eq('category_id', targetCategory)
                         .eq('cost_type', 'forecast')
 
-                    await supabase.from('contract_costs').insert({
+                    if (delErr) throw delErr
+
+                    const { error: insErr } = await supabase.from('contract_costs').insert({
                         contract_period_id: p.id,
                         category_id: targetCategory,
                         cost_type: 'forecast',
                         amount: monthlyAmount
                     })
+                    if (insErr) throw insErr
                 }
             }
 
-            await queryClient.invalidateQueries(['forecasting_periods', contractId])
-            await queryClient.invalidateQueries(['financials', contractId])
+            await queryClient.invalidateQueries({ queryKey: ['forecasting_periods', contractId] })
+            await queryClient.invalidateQueries({ queryKey: ['financials', contractId] })
+
             onClose()
             alert(`Successfully applied forecast of ${monthlyAmount.toFixed(2)} / month.`)
         } catch (err) {
