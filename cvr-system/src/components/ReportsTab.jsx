@@ -7,6 +7,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/Card'
 import { AlertCircle, ArrowUpRight, ArrowDownRight, FileText, GitCommit } from 'lucide-react'
+import FinancialReviewTable from './FinancialReviewTable'
 
 export default function ReportsTab({ contractId }) {
 
@@ -194,19 +195,8 @@ export default function ReportsTab({ contractId }) {
             </Card>
 
             {/* Event Log / Variance Table */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-sm">Variance Analysis</CardTitle>
-                        <CardDescription>Baseline vs Current Forecast</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-sm text-gray-500 text-center py-8 bg-gray-50 border border-dashed rounded">
-                            Variance breakdown by Cost Category coming soon.
-                            (Requires granular baseline/forecast comparison view).
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="grid grid-cols-1 gap-6">
+                <FinancialReviewTable contractId={contractId} />
 
                 <Card>
                     <CardHeader>
