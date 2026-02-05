@@ -80,7 +80,9 @@ export default function FinancialReviewTable({ contractId }) {
                 <td className={`${cellBase} bg-gray-50`}>{qtyMode ? fmtQty(item.est_final_qty) : fmt(item.estimated_final_budget)}</td>
                 <td className={cellBase}>{qtyMode ? fmtQty(item.actual_qty) : fmt(item.actual_cost)}</td>
                 <td className={cellBase}>{qtyMode ? fmtQty(item.forecast_qty) : fmt(item.forecast_to_complete)}</td>
-                <td className={cellBase}>{'-'}</td>{/* Previous Forecast Placeholder */}
+                <td className={`${cellBase} text-gray-500`}>
+                    {qtyMode ? fmtQty(item.previous_forecast_qty) : fmt(item.previous_forecast)}
+                </td>
             </tr>
         ))
     )
@@ -123,7 +125,7 @@ export default function FinancialReviewTable({ contractId }) {
                                 <td className={cellBase}>{fmtQty(sum(filterByGroup('Direct Labour'), 'est_final_qty'))}</td>
                                 <td className={cellBase}>{fmtQty(sum(filterByGroup('Direct Labour'), 'actual_qty'))}</td>
                                 <td className={cellBase}>{fmtQty(sum(filterByGroup('Direct Labour'), 'forecast_qty'))}</td>
-                                <td className={cellBase}>-</td>
+                                <td className={cellBase}>{fmtQty(sum(filterByGroup('Direct Labour'), 'previous_forecast_qty'))}</td>
                             </tr>
 
                             <tr className="h-4 border-none"><td colSpan={8}></td></tr>
@@ -142,7 +144,7 @@ export default function FinancialReviewTable({ contractId }) {
                                 <td className={cellBase}>{fmt(sum(filterByGroup('Direct Labour'), 'estimated_final_budget'))}</td>
                                 <td className={cellBase}>{fmt(sum(filterByGroup('Direct Labour'), 'actual_cost'))}</td>
                                 <td className={cellBase}>{fmt(sum(filterByGroup('Direct Labour'), 'forecast_to_complete'))}</td>
-                                <td className={cellBase}>-</td>
+                                <td className={cellBase}>{fmt(sum(filterByGroup('Direct Labour'), 'previous_forecast'))}</td>
                             </tr>
 
                             {/* Non-Labour Costs */}
@@ -168,7 +170,7 @@ export default function FinancialReviewTable({ contractId }) {
                                 <td className={cellBase}>{fmt(sum(costs, 'estimated_final_budget'))}</td>
                                 <td className={cellBase}>{fmt(totalCostActual)}</td>
                                 <td className={cellBase}>{fmt(totalCostForecast)}</td>
-                                <td className={cellBase}>-</td>
+                                <td className={cellBase}>{fmt(sum(costs, 'previous_forecast'))}</td>
                             </tr>
 
                             <tr className="h-4 border-none"><td colSpan={8}></td></tr>
@@ -183,7 +185,7 @@ export default function FinancialReviewTable({ contractId }) {
                                 <td className={cellBase}>{fmt(revenue?.estimated_final_revenue)}</td>
                                 <td className={cellBase}>{fmt(revenue?.actual_revenue)}</td>
                                 <td className={cellBase}>{fmt(revenue?.forecast_revenue)}</td>
-                                <td className={cellBase}>-</td>
+                                <td className={cellBase}>{fmt(revenue?.previous_forecast_revenue)}</td>
                             </tr>
 
                             {/* REVENUE ADJUSTMENTS (CHANGES) */}
@@ -209,7 +211,7 @@ export default function FinancialReviewTable({ contractId }) {
                                 <td className={cellBase}>{fmt(revEAC)}</td>{/* Assuming Est ~ EAC for revenue here */}
                                 <td className={cellBase}>{fmt(revenue?.actual_revenue)}</td>
                                 <td className={cellBase}>{fmt(revenue?.forecast_revenue)}</td>
-                                <td className={cellBase}>-</td>
+                                <td className={cellBase}>{fmt(revenue?.previous_forecast_revenue)}</td>
                             </tr>
 
                             <tr className="h-4 border-none"><td colSpan={8}></td></tr>
@@ -223,7 +225,9 @@ export default function FinancialReviewTable({ contractId }) {
                                 <td className={cellBase}>{fmt((revenue?.estimated_final_revenue || 0) - sum(costs, 'estimated_final_budget'))}</td>
                                 <td className={cellBase}>{fmt((revenue?.actual_revenue || 0) - totalCostActual)}</td>
                                 <td className={cellBase}>{fmt((revenue?.forecast_revenue || 0) - totalCostForecast)}</td>
-                                <td className={cellBase}>-</td>
+                                <td className={cellBase}>
+                                    {fmt((revenue?.previous_forecast_revenue || 0) - (sum(costs, 'previous_forecast') || 0))}
+                                </td>
                             </tr>
                             <tr className="bg-green-50 font-bold border-b-2 border-green-600 text-blue-800">
                                 <td className={cellLabel}>PROFIT %</td>
@@ -233,7 +237,11 @@ export default function FinancialReviewTable({ contractId }) {
                                 <td className={cellBase}>{revenue?.estimated_final_revenue ? fmtPct(((revenue.estimated_final_revenue - sum(costs, 'estimated_final_budget')) / revenue.estimated_final_revenue) * 100) : '-'}</td>
                                 <td className={cellBase}>-</td>
                                 <td className={cellBase}>-</td>
-                                <td className={cellBase}>-</td>
+                                <td className={cellBase}>
+                                    {(revenue?.previous_forecast_revenue) ?
+                                        fmtPct(((revenue.previous_forecast_revenue - sum(costs, 'previous_forecast')) / revenue.previous_forecast_revenue) * 100)
+                                        : '-'}
+                                </td>
                             </tr>
 
                         </tbody>
