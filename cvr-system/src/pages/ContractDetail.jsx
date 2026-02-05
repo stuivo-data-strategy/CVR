@@ -15,6 +15,7 @@ import ScenarioComparisonChart from '../components/scenarios/ScenarioComparisonC
 import ScenarioChangeBundler from '../components/scenarios/ScenarioChangeBundler'
 import { useScenarioForecasting } from '../hooks/useScenarioForecasting'
 import ForecastingTab from '../components/ForecastingTab'
+import ReportsTab from '../components/ReportsTab'
 
 export default function ContractDetail() {
     const { id } = useParams()
@@ -94,6 +95,10 @@ export default function ContractDetail() {
                     <TabsTrigger value="forecasting">Forecasting</TabsTrigger>
                     <TabsTrigger value="scenarios">What-If Scenarios</TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="reports">
+                    <ReportsTab contractId={id} />
+                </TabsContent>
 
                 <TabsContent value="financials">
                     <Card>

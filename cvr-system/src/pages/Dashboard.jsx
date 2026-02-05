@@ -1,182 +1,174 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card'
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts'
-import { Activity, TrendingUp, AlertTriangle, DollarSign } from 'lucide-react'
-
-// Sub-components (will extract later if they get too big)
-const KPICard = ({ title, value, subtext, icon: Icon, color }) => (
-    <Card>
-        <CardContent className="p-6 flex items-center justify-between">
-            <div>
-                <p className="text-sm font-medium text-gray-500">{title}</p>
-                <h3 className="text-2xl font-bold mt-1">{value}</h3>
-                {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
-            </div>
-            <div className={`p-3 rounded-full ${color}`}>
-                <Icon size={24} className="text-white" />
-            </div>
-        </CardContent>
-    </Card>
-)
+import { AlertCircle, TrendingUp, DollarSign, Activity } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export default function Dashboard() {
-    // State for interactive slider
-    const [marginThreshold, setMarginThreshold] = useState(5.0)
-
-    // Fetch Data
-    const { data: portfolioData, isLoading } = useQuery({
-        queryKey: ['portfolio_summary'],
+    // Fetch Portfolio Risk Types
+    const { data: riskData, isLoading } = useQuery({
+        queryKey: ['portfolio_risk'],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('portfolio_summary_view')
-                .select('*')
-            if (error) throw error
+            const { data, error } = await supabase.from('view_portfolio_risk').select('*')
+            if (error) {
+                console.error("Dashboard Error:", error)
+                throw new Error("Failed to load Risk Data. Please ensure 'view_portfolio_risk' exists. Details: " + error.message)
+            }
             return data
         }
     })
 
-    if (isLoading) return <div className="p-8">Loading dashboard analytics...</div>
+    if (isLoading) return <div className="p-8">Loading Dashboard...</div>
+    if (!riskData && !isLoading) return (
+        <div className="p-8 text-red-600 bg-red-50 rounded border border-red-200 m-6">
+            <h2 className="text-xl font-bold mb-2">Dashboard Error</h2>
+            <p>Could not load portfolio data. Please ensure the database migration for Phase 9 has been run.</p>
+        </div>
+    )
 
-    // 1. Calculate Aggregates
-    const totalRevenue = portfolioData?.reduce((acc, curr) => acc + curr.current_forecast_revenue, 0) || 0
-    const totalCost = portfolioData?.reduce((acc, curr) => acc + curr.current_forecast_cost, 0) || 0
-    const totalMargin = totalRevenue - totalCost
-    const overallMarginPct = totalRevenue > 0 ? (totalMargin / totalRevenue) * 100 : 0
+    // Calculate aggregated KPIs
+    const totalRevenue = riskData?.reduce((sum, c) => sum + (c.final_revenue || 0), 0) || 0
+    const totalMargin = riskData?.reduce((sum, c) => sum + (c.final_margin || 0), 0) || 0
+    const weightedMarginPct = totalRevenue ? (totalMargin / totalRevenue) * 100 : 0
 
-    // 2. Risk Analysis
-    const riskyContracts = portfolioData?.filter(c => c.current_margin_pct < marginThreshold) || []
+    const atRiskCount = riskData?.filter(c => c.risk_status !== 'low').length || 0
+    const highRiskCount = riskData?.filter(c => c.risk_status === 'high').length || 0
 
-    // 3. Grouping for Charts
-    const byPortfolio = portfolioData?.reduce((acc, curr) => {
-        const pf = curr.portfolio || 'Unknown'
-        if (!acc[pf]) acc[pf] = { name: pf, revenue: 0, margin: 0 }
-        acc[pf].revenue += curr.current_forecast_revenue
-        acc[pf].margin += curr.current_margin_amt
-        return acc
-    }, {})
-    const portfolioChartData = Object.values(byPortfolio || {})
-
-    // Formatters
-    const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format
-    const pct = (val) => `${val.toFixed(1)}%`
+    const atRiskContracts = riskData?.filter(c => c.risk_status !== 'low')
+        .sort((a, b) => a.margin_variance - b.margin_variance) // Worst erosion first
 
     return (
-        <div className="flex flex-col gap-8 pb-12">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">Executive Dashboard</h1>
-                <p className="text-gray-500 mt-1">Real-time portfolio insights and health monitoring.</p>
+        <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
+            <div className="flex flex-col gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">Portfolio Overview</h1>
+                <p className="text-gray-500">Executive Summary & Risk Analysis</p>
             </div>
 
-            {/* KPI Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <KPICard
-                    title="Total Revenue"
-                    value={currency(totalRevenue)}
-                    icon={DollarSign}
-                    color="bg-blue-600"
-                />
-                <KPICard
-                    title="Overall Margin"
-                    value={pct(overallMarginPct)}
-                    subtext={`Target: >8.0%`} // Hardcoded goal for now
-                    icon={TrendingUp}
-                    color={overallMarginPct >= 8 ? "bg-emerald-500" : "bg-amber-500"}
-                />
-                <KPICard
-                    title="Active Contracts"
-                    value={portfolioData?.length || 0}
-                    icon={Activity}
-                    color="bg-indigo-500"
-                />
-                <KPICard
-                    title="Contracts At Risk"
-                    value={riskyContracts.length}
-                    subtext={`< ${marginThreshold}% Margin`}
-                    icon={AlertTriangle}
-                    color={riskyContracts.length > 0 ? "bg-red-500" : "bg-emerald-500"}
-                />
-            </div>
-
-            {/* Main Charts Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Visual: Revenue by Portfolio */}
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Revenue by Portfolio</CardTitle>
-                        <CardDescription>Breakdown of total forecast revenue across business units.</CardDescription>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">Total Pipeline Value</CardTitle>
+                        <DollarSign className="h-4 w-4 text-gray-500" />
                     </CardHeader>
-                    <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={portfolioChartData}>
-                                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value / 1000000}M`} />
-                                <Tooltip formatter={(value) => currency(value)} cursor={{ fill: '#f3f4f6' }} />
-                                <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                            ${(totalRevenue / 1000000).toFixed(1)}M
+                        </div>
+                        <p className="text-xs text-gray-500">Forecast Revenue</p>
                     </CardContent>
                 </Card>
 
-                {/* Interactive: Margin Stress Test */}
-                <Card className="lg:col-span-1 bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none shadow-xl">
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <AlertTriangle className="text-yellow-400" size={20} />
-                            <CardTitle className="text-white">Stress Test</CardTitle>
-                        </div>
-                        <CardDescription className="text-slate-400">
-                            Identify contracts that fail to meet a minimum margin threshold.
-                        </CardDescription>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">Portfolio Margin</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
-                    <CardContent className="flex flex-col gap-6">
-                        {/* Slider Control */}
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                            {weightedMarginPct.toFixed(1)}%
+                        </div>
+                        <p className="text-xs text-gray-500">Weighted Average</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">Contracts At Risk</CardTitle>
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-amber-600">
+                            {atRiskCount}
+                        </div>
+                        <p className="text-xs text-gray-500">{highRiskCount} Critical</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">Active Contracts</CardTitle>
+                        <Activity className="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                            {riskData?.length || 0}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* WATCHLIST */}
+            <Card className="border-red-100 shadow-sm">
+                <CardHeader className="bg-red-50/30 border-b border-red-100">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle className="text-red-500" />
                         <div>
-                            <div className="flex justify-between text-sm mb-2">
-                                <span className="text-slate-300">Minimum Margin Target</span>
-                                <span className="text-xl font-bold text-yellow-400">{marginThreshold}%</span>
-                            </div>
-                            <input
-                                type="range"
-                                min="0"
-                                max="20"
-                                step="0.5"
-                                value={marginThreshold}
-                                onChange={(e) => setMarginThreshold(parseFloat(e.target.value))}
-                                className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-yellow-400"
-                            />
-                            <div className="flex justify-between text-xs text-slate-500 mt-1">
-                                <span>0%</span>
-                                <span>20%</span>
-                            </div>
+                            <CardTitle className="text-lg text-red-900">At Risk Watchlist</CardTitle>
+                            <CardDescription>Contracts eroding margin vs baseline target.</CardDescription>
                         </div>
-
-                        {/* Result List */}
-                        <div className="flex-1 overflow-y-auto max-h-[200px] pr-2 space-y-2">
-                            {riskyContracts.length === 0 ? (
-                                <div className="text-center py-8 text-slate-500 text-sm">
-                                    All contracts involve healthy margins!
-                                </div>
-                            ) : (
-                                riskyContracts.map(c => (
-                                    <div key={c.id} className="bg-white/10 p-3 rounded flex justify-between items-center text-sm border border-white/5">
-                                        <div className="flex flex-col">
-                                            <span className="font-semibold">{c.contract_code}</span>
-                                            <span className="text-xs text-slate-400">{c.name}</span>
-                                        </div>
-                                        <div className="text-red-400 font-mono font-bold">
-                                            {c.current_margin_pct.toFixed(1)}%
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="relative overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                                <tr>
+                                    <th className="px-6 py-3">Contract</th>
+                                    <th className="px-6 py-3 text-center">Risk Level</th>
+                                    <th className="px-6 py-3 text-right">Target Margin</th>
+                                    <th className="px-6 py-3 text-right">Current Forecast</th>
+                                    <th className="px-6 py-3 text-right">Variance</th>
+                                    <th className="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {atRiskContracts?.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                                            No contracts currently flagged as 'At Risk'. Great job!
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    atRiskContracts?.map((c) => (
+                                        <tr key={c.contract_id} className="bg-white border-b hover:bg-gray-50">
+                                            <td className="px-6 py-4 font-medium text-gray-900">
+                                                {c.contract_code} - {c.contract_name}
+                                                <div className="text-xs text-gray-500 font-normal">{c.owner_name}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${c.risk_status === 'high' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                                                    }`}>
+                                                    {c.risk_status.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {c.target_margin_pct?.toFixed(1)}%
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-bold">
+                                                {c.current_forecast_margin_pct?.toFixed(1)}%
+                                            </td>
+                                            <td className={`px-6 py-4 text-right font-bold ${c.margin_variance < 0 ? 'text-red-600' : 'text-green-600'
+                                                }`}>
+                                                {c.margin_variance?.toFixed(1)}%
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <Link
+                                                    to={`/contracts/${c.contract_id}?tab=reports`}
+                                                    className="font-medium text-blue-600 hover:underline"
+                                                >
+                                                    View Report
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     )
 }

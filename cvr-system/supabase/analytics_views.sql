@@ -89,7 +89,7 @@ select
     contract_id,
     period_month as event_date,
     'narrative' as event_type,
-    type as category,
+    type::text as category,
     title as description,
     created_by
 from contract_narratives
@@ -99,7 +99,7 @@ select
     contract_id,
     effective_date as event_date,
     'change' as event_type,
-    change_type as category,
+    change_type::text as category,
     change_code || ': ' || coalesce(title, 'Contract Change') as description,
     created_by
 from contract_changes
