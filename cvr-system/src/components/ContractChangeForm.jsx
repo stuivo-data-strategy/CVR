@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/Dialog'
+import { Plus, Trash2, Calendar, DollarSign, Calculator } from 'lucide-react'
 import { Button } from './ui/Button'
 import { AlertDialog } from './ui/AlertDialog'
-import { Plus, Trash2, Calendar, DollarSign, Calculator, AlertCircle } from 'lucide-react'
-import './ContractChangeForm.css' // Restored for layout styles
+
 
 // Simple UUID generator fallback
 const generateId = () => {
@@ -63,8 +62,16 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     const [costCategories, setCostCategories] = useState([])
     const [profiles, setProfiles] = useState([])
     const [activeTab, setActiveTab] = useState('identification') // identification, financial, forecasting, governance
-    const [alertConfig, setAlertConfig] = useState({ open: false, title: '', description: '', onConfirm: null, variant: 'primary' })
-    const [error, setError] = useState(null)
+
+    const [alertState, setAlertState] = useState({
+        open: false,
+        title: '',
+        description: '',
+        variant: 'default',
+        showCancel: true,
+        onConfirm: null
+    })
+    const closeAlert = () => setAlertState(prev => ({ ...prev, open: false }))
 
     useEffect(() => {
         const fetchRefData = async () => {
@@ -151,48 +158,10 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     }
 
     // --- SUBMIT ---
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-
+    const saveChanges = async () => {
         try {
-            // 1. Validate totals (Client side check)
-            const sumImpactRev = formData.impacts.reduce((s, i) => s + (parseFloat(i.revenue_delta) || 0), 0)
-            const sumImpactCost = formData.impacts.reduce((s, i) => s + (parseFloat(i.cost_delta) || 0), 0)
-
-            // Warnings (soft validation)
-            if (Math.abs(sumImpactRev - formData.revenue_delta) > 1) {
-                // Modern Confirm Dialog
-                setAlertConfig({
-                    open: true,
-                    title: 'Revenue Mismatch',
-                    description: `Time-phased revenue (${sumImpactRev.toFixed(2)}) does not match headline revenue (${formData.revenue_delta.toFixed(2)}). Continue anyway?`,
-                    variant: 'warning',
-                    confirmText: 'Continue',
-                    onConfirm: () => submitData(formData) // Proceed
-                })
-                return
-            }
-
-            await submitData(formData)
-
-        } catch (err) {
-            console.error(err)
-            setError(err.message)
-        }
-    }
-
-    const submitData = async (data) => {
-        try {
-
             // 2. Upsert Contract Change
-            // Exclude arrays 'cost_breakdown' and 'impacts' from the insert object for the main table
             const { cost_breakdown, impacts, ...mainChangeData } = formData
-
-            // Need to ensure keys match database columns exactly. 
-            // 'raised_by' maps to nothing? Ah user ID. 'created_by' is default.
-            // Let's rely on default 'created_by' trigger or pass it if column exists (it does).
-            // But 'raised_by' is not a column in my v2 schema, I added 'commercial_owner' etc. 
-            // Let's drop 'raised_by' from insert unless I add it to schema or map it to 'created_by'.
 
             const insertData = {
                 contract_id: contractId,
@@ -221,9 +190,17 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                 // ... forecast fields
             }
 
-            // 3. Upsert Contract Change
-            // Use local ID to ensure we can link impacts immediately
-            const finalId = formData.id
+            // Update or Insert
+            const { data: changeParams, error: mainError } = await supabase
+                .from('contract_changes')
+                .upsert(insertData)
+                .select()
+                .single()
+
+            if (mainError) throw mainError
+
+            // 3. Handle Impacts (Delete all and re-insert for simplicity)
+            let finalId = formData.id // if we decide to force UUID client side
 
             const { error: upsertErr } = await supabase.from('contract_changes').upsert({
                 id: finalId,
@@ -248,44 +225,55 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                 if (impErr) throw impErr
             }
 
-            // 4. Handle Cost Breakdown (Not currently a separate table in schema V2? 
-            // Schema v2 has 'contract_costs' but that is for ACTUALS/PERIOD data. 
-            // The prompt "Insert cost breakdown rows into new table" implies we need a `contract_change_cost_breakdown` table?
-            // User schema update B: Add FK to `contract_costs`. 
-            // User schema update C: Add FK to `contract_change_impacts`. 
-            // User didn't request a `contract_change_cost_breakdown` table in the Schema Updates section.
-            // "Cost Breakdown Table ... Dynamic row table" in Section C.
-            // "Insert cost breakdown rows into new table (see schema below)" -> Schema below did NOT have a new table for this.
-            // It only mentioned cost_categories. 
-            // I will assume for now we store this in `contract_change_impacts` if period is null? No, period is required.
-            // Maybe the "Cost Breakdown" is just a UI tool to sum up into `cost_delta`? 
-            // OR I missed a table. 
-            // Let's assume the Time-Phased Impact IS the detailed breakdown storage.
-            // The Form Spec separates "Section C Cost Breakdown" and "Section D Time-Phased".
-            // If there's no table, I'll store it as impacts with a default logic or just ignore persistence of the ephemeral breakdown and rely on Time-Phased.
-            // Wait, "Insert cost breakdown rows into new table (see schema below)" -> Looking closely at Step 177:
-            // "5. Database Schema Updates ... A, B, C, D". NO new table for breakdown.
-            // I'll assume Section C is just a calculator for now, or Imapcts ARE the breakdown.
-
             onSuccess()
             onClose()
+
         } catch (err) {
             console.error(err)
-            setError('Error saving change: ' + err.message)
+            setAlertState({
+                open: true,
+                title: 'Error',
+                description: 'Error saving change: ' + err.message,
+                variant: 'destructive',
+                showCancel: false,
+                onConfirm: () => closeAlert()
+            })
         }
     }
 
-    // Constant Styles
-    const selectClass = "w-full border p-2 rounded bg-white"
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+
+        // 1. Validate totals (Client side check)
+        const sumImpactRev = formData.impacts.reduce((s, i) => s + (parseFloat(i.revenue_delta) || 0), 0)
+
+        // Warnings (soft validation)
+        if (Math.abs(sumImpactRev - formData.revenue_delta) > 1) {
+            setAlertState({
+                open: true,
+                title: 'Revenue Mismatch',
+                description: `Warning: Time-phased revenue (${sumImpactRev}) does not match headline revenue (${formData.revenue_delta}). Continue?`,
+                variant: 'default',
+                showCancel: true,
+                onConfirm: () => saveChanges()
+            })
+            return
+        }
+
+        await saveChanges()
+    }
 
     // --- RENDERERS ---
     const renderNav = () => (
-        <div className="tab-nav">
+        <div className="flex border-b border-gray-200 bg-white px-6">
             {['identification', 'financial', 'forecasting', 'governance'].map(tab => (
                 <button
                     key={tab}
                     type="button"
-                    className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
+                    className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors focus:outline-none ${activeTab === tab
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
                     onClick={() => setActiveTab(tab)}
                 >
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -295,24 +283,24 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     )
 
     const renderIdentification = () => (
-        <div className="form-section-content">
-            <h3 className="section-title">Change Identification</h3>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                    <label>Change Code *</label>
-                    <input required value={formData.change_code} onChange={e => handleChange('change_code', e.target.value)} />
+        <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">Change Identification</h3>
+            <div className="grid grid-cols-2 gap-6">
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Change Code <span className="text-red-500">*</span></label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required value={formData.change_code} onChange={e => handleChange('change_code', e.target.value)} />
                 </div>
-                <div className="form-group">
-                    <label>Title *</label>
-                    <input required value={formData.title} onChange={e => handleChange('title', e.target.value)} />
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Title <span className="text-red-500">*</span></label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required value={formData.title} onChange={e => handleChange('title', e.target.value)} />
                 </div>
-                <div className="form-group col-span-2">
-                    <label>Description *</label>
-                    <textarea required rows={3} value={formData.description} onChange={e => handleChange('description', e.target.value)} />
+                <div className="flex flex-col gap-1 col-span-2">
+                    <label className="text-sm font-medium text-gray-700">Description <span className="text-red-500">*</span></label>
+                    <textarea className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required rows={3} value={formData.description} onChange={e => handleChange('description', e.target.value)} />
                 </div>
-                <div className="form-group">
-                    <label>Change Type</label>
-                    <select value={formData.change_type} onChange={e => handleChange('change_type', e.target.value)}>
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Change Type</label>
+                    <select className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.change_type} onChange={e => handleChange('change_type', e.target.value)}>
                         <option value="scope_addition">Scope Addition</option>
                         <option value="scope_reduction">Scope Reduction</option>
                         <option value="rate_change">Rate Change</option>
@@ -321,32 +309,32 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                         <option value="other">Other</option>
                     </select>
                 </div>
-                <div className="form-group">
-                    <label>Reason</label>
-                    <textarea rows={1} value={formData.reason_for_change} onChange={e => handleChange('reason_for_change', e.target.value)} />
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Reason</label>
+                    <textarea className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows={1} value={formData.reason_for_change} onChange={e => handleChange('reason_for_change', e.target.value)} />
                 </div>
-                <div className="form-group">
-                    <label>Customer Ref</label>
-                    <input value={formData.customer_reference} onChange={e => handleChange('customer_reference', e.target.value)} />
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Customer Ref</label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.customer_reference} onChange={e => handleChange('customer_reference', e.target.value)} />
                 </div>
-                <div className="form-group">
-                    <label>Customer Contact</label>
-                    <input value={formData.customer_contact} onChange={e => handleChange('customer_contact', e.target.value)} />
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Customer Contact</label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.customer_contact} onChange={e => handleChange('customer_contact', e.target.value)} />
                 </div>
             </div>
 
-            <h4 className="subsection-title mt-4">Ownership</h4>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                    <label>Commercial Owner</label>
-                    <select value={formData.commercial_owner} onChange={e => handleChange('commercial_owner', e.target.value)} className={selectClass}>
+            <h4 className="text-sm font-semibold text-gray-600 mt-8 mb-4 uppercase tracking-wider">Ownership</h4>
+            <div className="grid grid-cols-3 gap-6">
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Commercial Owner</label>
+                    <select className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.commercial_owner} onChange={e => handleChange('commercial_owner', e.target.value)}>
                         <option value="">Select...</option>
                         {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
                     </select>
                 </div>
-                <div className="form-group">
-                    <label>Technical Owner</label>
-                    <select value={formData.technical_owner} onChange={e => handleChange('technical_owner', e.target.value)} className={selectClass}>
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Technical Owner</label>
+                    <select className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.technical_owner} onChange={e => handleChange('technical_owner', e.target.value)}>
                         <option value="">Select...</option>
                         {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
                     </select>
@@ -356,192 +344,208 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     )
 
     const renderFinancial = () => (
-        <div className="form-section-content">
-            <h3 className="section-title">Commercial & Financial Impact</h3>
+        <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">Commercial & Financial Impact</h3>
 
             {/* Headline */}
-            <div className="p-4 bg-gray-50 rounded mb-4">
-                <h4 className="text-sm font-bold text-gray-500 mb-2">Headline Deltas</h4>
-                <div className="grid grid-cols-4 gap-4">
-                    <div className="form-group">
-                        <label>Revenue Delta</label>
-                        <div className="input-icon-wrapper">
-                            <DollarSign size={14} className="input-icon" />
-                            <input type="number" value={formData.revenue_delta} onChange={e => handleChange('revenue_delta', parseFloat(e.target.value))} />
+            <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-lg mb-6 shadow-sm">
+                <h4 className="text-xs uppercase tracking-wider font-bold text-gray-500 mb-4">Headline Deltas</h4>
+                <div className="grid grid-cols-4 gap-6">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-gray-500">Revenue Change</label>
+                        <div className="relative">
+                            <DollarSign size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input type="number"
+                                className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                                value={formData.revenue_delta}
+                                onChange={e => handleChange('revenue_delta', parseFloat(e.target.value))}
+                            />
                         </div>
                     </div>
-                    <div className="form-group">
-                        <label>Cost Delta</label>
-                        <div className="input-icon-wrapper">
-                            <DollarSign size={14} className="input-icon" />
-                            <input type="number" value={formData.cost_delta} onChange={e => handleChange('cost_delta', parseFloat(e.target.value))} />
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-gray-500">Cost Change</label>
+                        <div className="relative">
+                            <DollarSign size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input type="number"
+                                className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                                value={formData.cost_delta}
+                                onChange={e => handleChange('cost_delta', parseFloat(e.target.value))}
+                            />
                         </div>
                     </div>
-                    <div className="form-group">
-                        <label>Margin Impact</label>
-                        <input disabled value={((formData.revenue_delta - formData.cost_delta)).toFixed(2)} className={formData.revenue_delta - formData.cost_delta >= 0 ? 'text-green-600' : 'text-red-600'} />
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-gray-500">Net Margin Impact</label>
+                        <input disabled
+                            value={((formData.revenue_delta - formData.cost_delta)).toFixed(2)}
+                            className={`w-full px-3 py-2 bg-gray-50 border border-dotted border-gray-300 rounded text-sm font-bold ${formData.revenue_delta - formData.cost_delta >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-gray-500">Effective Date</label>
+                        <input type="date"
+                            className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={formData.effective_date}
+                            onChange={e => handleChange('effective_date', e.target.value)}
+                        />
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                    <div className="form-group">
-                        <label>Effective Date</label>
-                        <input type="date" value={formData.effective_date} onChange={e => handleChange('effective_date', e.target.value)} />
-                    </div>
-                    <div className="flex gap-4 mt-6">
-                        <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={formData.is_retrospective} onChange={e => handleChange('is_retrospective', e.target.checked)} />
-                            Is Retrospective?
-                        </label>
-                        <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={formData.requires_rebaseline} onChange={e => handleChange('requires_rebaseline', e.target.checked)} />
-                            Requires Re-baseline?
-                        </label>
-                    </div>
+                <div className="flex gap-6 mt-4 pt-4 border-t border-blue-100">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500" checked={formData.is_retrospective} onChange={e => handleChange('is_retrospective', e.target.checked)} />
+                        Is Retrospective?
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500" checked={formData.requires_rebaseline} onChange={e => handleChange('requires_rebaseline', e.target.checked)} />
+                        Requires Re-baseline?
+                    </label>
                 </div>
             </div>
 
             {/* Cost Breakdown UI (Calculator) */}
-            <div className="mb-6">
-                <div className="flex justify-between items-center mb-2">
-                    <h4 className="subsection-title">Cost Breakdown (Calculator)</h4>
-                    <button type="button" onClick={addCostRow} className="btn-xs btn-outline">+ Add Item</button>
+            <div className="mb-8 p-4 border border-gray-200 rounded-lg">
+                <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-semibold text-gray-700">Cost Breakdown (Calculator)</h4>
+                    <button type="button" onClick={addCostRow} className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium">+ Add Item</button>
                 </div>
                 {formData.cost_breakdown?.length > 0 && (
-                    <table className="mini-table">
-                        <thead>
+                    <table className="w-full text-sm">
+                        <thead className="text-xs text-gray-500 font-medium bg-gray-50 border-b">
                             <tr>
-                                <th>Category</th>
-                                <th>Amount</th>
-                                <th>Notes</th>
-                                <th></th>
+                                <th className="text-left py-2 px-3">Category</th>
+                                <th className="text-left py-2 px-3">Amount</th>
+                                <th className="text-left py-2 px-3">Notes</th>
+                                <th className="w-8"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y">
                             {formData.cost_breakdown.map(row => (
                                 <tr key={row.id}>
-                                    <td>
-                                        <select value={row.category_id} onChange={e => updateCostRow(row.id, 'category_id', e.target.value)}>
+                                    <td className="py-2 px-3">
+                                        <select className="w-full border-gray-200 rounded text-sm py-1" value={row.category_id} onChange={e => updateCostRow(row.id, 'category_id', e.target.value)}>
                                             {costCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </td>
-                                    <td><input type="number" value={row.cost_delta} onChange={e => updateCostRow(row.id, 'cost_delta', e.target.value)} /></td>
-                                    <td><input type="text" value={row.notes} onChange={e => updateCostRow(row.id, 'notes', e.target.value)} /></td>
-                                    <td><button type="button" className="text-red-500" onClick={() => removeCostRow(row.id)}><Trash2 size={14} /></button></td>
+                                    <td className="py-2 px-3"><input type="number" className="w-full border-gray-200 rounded text-sm py-1" value={row.cost_delta} onChange={e => updateCostRow(row.id, 'cost_delta', e.target.value)} /></td>
+                                    <td className="py-2 px-3"><input type="text" className="w-full border-gray-200 rounded text-sm py-1" value={row.notes} onChange={e => updateCostRow(row.id, 'notes', e.target.value)} /></td>
+                                    <td className="py-2 px-3 text-center"><button type="button" className="text-gray-400 hover:text-red-500" onClick={() => removeCostRow(row.id)}><Trash2 size={14} /></button></td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                )}
+                {(!formData.cost_breakdown || formData.cost_breakdown.length === 0) && (
+                    <div className="text-xs text-gray-400 text-center py-4 bg-gray-50 rounded">No items in breakdown match.</div>
                 )}
             </div>
 
             {/* Time Phased Impacts */}
             <div className="mb-4">
                 <div className="flex justify-between items-center mb-2">
-                    <h4 className="subsection-title">Time-Phased Impact (Detailed)</h4>
-                    <button type="button" onClick={addImpactRow} className="btn-xs btn-outline">+ Add Period</button>
+                    <h4 className="text-sm font-semibold text-gray-700">Time-Phased Impact (Detailed)</h4>
+                    <button type="button" onClick={addImpactRow} className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium">+ Add Period</button>
                 </div>
                 {formData.impacts?.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="mini-table">
-                            <thead>
+                    <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                        <table className="w-full text-sm">
+                            <thead className="text-xs text-gray-500 font-medium bg-gray-50 border-b">
                                 <tr>
-                                    <th>Period</th>
-                                    <th>Rev Delta</th>
-                                    <th>Cost Delta</th>
-                                    <th>Cost Category</th>
-                                    <th>Scenario Only?</th>
-                                    <th></th>
+                                    <th className="text-left py-2 px-3 whitespace-nowrap">Period</th>
+                                    <th className="text-left py-2 px-3 whitespace-nowrap">Rev Delta</th>
+                                    <th className="text-left py-2 px-3 whitespace-nowrap">Cost Delta</th>
+                                    <th className="text-left py-2 px-3 whitespace-nowrap">Cost Category</th>
+                                    <th className="text-center py-2 px-3 whitespace-nowrap">Scenario Only</th>
+                                    <th className="w-8"></th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="divide-y">
                                 {formData.impacts.map(row => (
                                     <tr key={row.id}>
-                                        <td><input type="month" value={row.period_month?.slice(0, 7)} onChange={e => updateImpactRow(row.id, 'period_month', e.target.value + '-01')} /></td>
-                                        <td><input type="number" value={row.revenue_delta} onChange={e => updateImpactRow(row.id, 'revenue_delta', parseFloat(e.target.value))} /></td>
-                                        <td><input type="number" value={row.cost_delta} onChange={e => updateImpactRow(row.id, 'cost_delta', parseFloat(e.target.value))} /></td>
-                                        <td>
-                                            <select value={row.cost_category_id} onChange={e => updateImpactRow(row.id, 'cost_category_id', e.target.value)}>
+                                        <td className="py-2 px-3"><input type="month" className="w-full border-gray-200 rounded text-sm py-1" value={row.period_month?.slice(0, 7)} onChange={e => updateImpactRow(row.id, 'period_month', e.target.value + '-01')} /></td>
+                                        <td className="py-2 px-3"><input type="number" className="w-full border-gray-200 rounded text-sm py-1" value={row.revenue_delta} onChange={e => updateImpactRow(row.id, 'revenue_delta', parseFloat(e.target.value))} /></td>
+                                        <td className="py-2 px-3"><input type="number" className="w-full border-gray-200 rounded text-sm py-1" value={row.cost_delta} onChange={e => updateImpactRow(row.id, 'cost_delta', parseFloat(e.target.value))} /></td>
+                                        <td className="py-2 px-3">
+                                            <select className="w-full border-gray-200 rounded text-sm py-1" value={row.cost_category_id} onChange={e => updateImpactRow(row.id, 'cost_category_id', e.target.value)}>
                                                 {costCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                             </select>
                                         </td>
-                                        <td><input type="checkbox" checked={row.is_scenario_only} onChange={e => updateImpactRow(row.id, 'is_scenario_only', e.target.checked)} /></td>
-                                        <td><button type="button" className="text-red-500" onClick={() => removeImpactRow(row.id)}><Trash2 size={14} /></button></td>
+                                        <td className="py-2 px-3 text-center"><input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500" checked={row.is_scenario_only} onChange={e => updateImpactRow(row.id, 'is_scenario_only', e.target.checked)} /></td>
+                                        <td className="py-2 px-3 text-center"><button type="button" className="text-gray-400 hover:text-red-500" onClick={() => removeImpactRow(row.id)}><Trash2 size={14} /></button></td>
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot>
+                            <tfoot className="bg-gray-50 border-t font-semibold">
                                 <tr>
-                                    <td><strong>Total</strong></td>
-                                    <td>{formData.impacts.reduce((s, i) => s + (i.revenue_delta || 0), 0).toFixed(2)}</td>
-                                    <td>{formData.impacts.reduce((s, i) => s + (i.cost_delta || 0), 0).toFixed(2)}</td>
+                                    <td className="py-2 px-3 text-gray-500">Total</td>
+                                    <td className="py-2 px-3 text-gray-800">{formData.impacts.reduce((s, i) => s + (i.revenue_delta || 0), 0).toFixed(2)}</td>
+                                    <td className="py-2 px-3 text-gray-800">{formData.impacts.reduce((s, i) => s + (i.cost_delta || 0), 0).toFixed(2)}</td>
                                     <td colSpan={3}></td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
-                ) : <div className="p-4 border border-dashed text-center text-gray-400">No time-phased impacts added.</div>}
+                ) : <div className="p-4 border border-dashed border-gray-300 rounded-lg text-center text-gray-400 text-sm">No time-phased impacts added.</div>}
             </div>
         </div>
     )
 
     const renderGovernance = () => (
-        <div className="form-section-content">
-            <h3 className="section-title">Governance & Risk</h3>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                    <label>Status</label>
-                    <select value={formData.status} onChange={e => handleChange('status', e.target.value)}>
+        <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">Governance & Risk</h3>
+            <div className="grid grid-cols-2 gap-6">
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Status</label>
+                    <select className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.status} onChange={e => handleChange('status', e.target.value)}>
                         <option value="proposed">Proposed</option>
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                         <option value="implemented">Implemented</option>
                     </select>
                 </div>
-                <div className="form-group">
-                    <label>Risk Level</label>
-                    <select value={formData.risk_level} onChange={e => handleChange('risk_level', e.target.value)}>
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Risk Level</label>
+                    <select className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.risk_level} onChange={e => handleChange('risk_level', e.target.value)}>
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
                 </div>
-                <div className="form-group">
+                <div className="flex flex-col gap-1">
                     <label className="flex items-center gap-2 mt-6">
-                        <input type="checkbox" checked={formData.customer_approval_received} onChange={e => handleChange('customer_approval_received', e.target.checked)} />
+                        <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500" checked={formData.customer_approval_received} onChange={e => handleChange('customer_approval_received', e.target.checked)} />
                         Customer Approval Received?
                     </label>
                 </div>
-                <div className="form-group">
-                    <label>Approval Date</label>
-                    <input type="date" value={formData.approval_date} onChange={e => handleChange('approval_date', e.target.value)} />
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Approval Date</label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="date" value={formData.approval_date} onChange={e => handleChange('approval_date', e.target.value)} />
                 </div>
             </div>
 
-            <h4 className="subsection-title mt-4">Forecasting Factors</h4>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                    <label>Conv. Prob. (%)</label>
-                    <input type="number" min="0" max="100" value={formData.conversion_probability_pct} onChange={e => handleChange('conversion_probability_pct', parseFloat(e.target.value))} />
+            <h4 className="text-sm font-semibold text-gray-600 mt-8 mb-4 uppercase tracking-wider">Forecasting Factors</h4>
+            <div className="grid grid-cols-2 gap-6">
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Conv. Prob. (%)</label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" min="0" max="100" value={formData.conversion_probability_pct} onChange={e => handleChange('conversion_probability_pct', parseFloat(e.target.value))} />
                 </div>
-                <div className="form-group">
-                    <label>Pot. Disallowed Costs</label>
-                    <input type="number" value={formData.potential_disallowed_costs} onChange={e => handleChange('potential_disallowed_costs', parseFloat(e.target.value))} />
+                <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">Pot. Disallowed Costs</label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" value={formData.potential_disallowed_costs} onChange={e => handleChange('potential_disallowed_costs', parseFloat(e.target.value))} />
                 </div>
-                <div className="form-group col-span-2">
-                    <label>Tags (comma sep)</label>
-                    <input placeholder="e.g. claim, vo, disputed" value={formData.tags?.join(', ')} onChange={e => handleChange('tags', e.target.value.split(',').map(s => s.trim()))} />
+                <div className="flex flex-col gap-1 col-span-2">
+                    <label className="text-sm font-medium text-gray-700">Tags (comma sep)</label>
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. claim, vo, disputed" value={formData.tags?.join(', ')} onChange={e => handleChange('tags', e.target.value.split(',').map(s => s.trim()))} />
                 </div>
 
                 <div className="col-span-2 mt-4 pt-4 border-t">
-                    <h4 className="subsection-title">Narrative & Review</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="form-group">
-                            <label>Risk Narrative</label>
-                            <textarea rows={4} value={formData.risk_narrative || ''} onChange={e => handleChange('risk_narrative', e.target.value)} placeholder="Describe risks..." />
+                    <h4 className="text-sm font-semibold text-gray-600 mb-4 uppercase tracking-wider">Narrative & Review</h4>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium text-gray-700">Risk Narrative</label>
+                            <textarea className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows={4} value={formData.risk_narrative || ''} onChange={e => handleChange('risk_narrative', e.target.value)} placeholder="Describe risks..." />
                         </div>
-                        <div className="form-group">
-                            <label>Opportunity Narrative</label>
-                            <textarea rows={4} value={formData.opportunity_narrative || ''} onChange={e => handleChange('opportunity_narrative', e.target.value)} placeholder="Describe opportunities..." />
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium text-gray-700">Opportunity Narrative</label>
+                            <textarea className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows={4} value={formData.opportunity_narrative || ''} onChange={e => handleChange('opportunity_narrative', e.target.value)} placeholder="Describe opportunities..." />
                         </div>
                     </div>
                 </div>
@@ -550,54 +554,49 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     )
 
     return (
-        <Dialog open={true} onOpenChange={onClose} className="max-w-5xl">
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-                <DialogHeader className="px-6 py-4 border-b">
-                    <DialogTitle className="flex justify-between items-center">
-                        <span>Contract Change Request (CCR)</span>
-                        {formData.status === 'approved' && <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Approved</span>}
-                    </DialogTitle>
-                </DialogHeader>
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-[1000]">
+            <div className="bg-white w-[1200px] max-w-[95vw] h-[90vh] rounded-lg shadow-2xl flex flex-col overflow-hidden">
+                <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 className="text-xl font-semibold text-gray-800">Contract Change Request (CCR)</h2>
+                    <div className="flex items-center gap-2">
+                        {formData.status === 'approved' && <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium border border-green-200">Approved</span>}
+                        <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+                    </div>
+                </div>
 
-                <div className="flex-1 overflow-y-auto px-6 py-4">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
-                            <AlertCircle size={16} /> {error}
-                            <button onClick={() => setError(null)} className="ml-auto text-sm underline">Dismiss</button>
-                        </div>
-                    )}
-
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden bg-white">
                     {renderNav()}
 
-                    <div className="tab-content mt-4">
+                    <div className="flex-1 overflow-y-auto bg-white">
                         {activeTab === 'identification' && renderIdentification()}
                         {activeTab === 'financial' && renderFinancial()}
                         {activeTab === 'forecasting' && <div className="p-4">Forecasting options included in Governance tab for now. <button type="button" className="text-blue-600 underline" onClick={() => setActiveTab('governance')}>Go to Governance</button></div>}
                         {activeTab === 'governance' && renderGovernance()}
                     </div>
-                </div>
 
-                <DialogFooter className="px-6 py-4 border-t bg-gray-50 flex justify-between items-center sm:justify-between">
-                    <div className="text-xs text-gray-500 flex flex-col">
-                        <span>Total Revenue: {formData.revenue_delta?.toFixed(2)}</span>
-                        <span>Total Cost: {formData.cost_delta?.toFixed(2)}</span>
+                    <div className="flex justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
+                        <div className="flex justify-between w-full">
+                            <div className="text-xs text-gray-500 flex flex-col justify-center gap-1">
+                                <span className="flex items-center gap-2">Total Revenue: <span className="font-semibold text-gray-700">{formData.revenue_delta}</span></span>
+                                <span className="flex items-center gap-2">Total Cost: <span className="font-semibold text-gray-700">{formData.cost_delta}</span></span>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+                                <Button type="submit">Save Change Request</Button>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button onClick={handleSubmit}>Save Change Request</Button>
-                    </div>
-                </DialogFooter>
-            </DialogContent>
-
+                </form>
+            </div>
             <AlertDialog
-                open={alertConfig.open}
-                onOpenChange={(val) => setAlertConfig(prev => ({ ...prev, open: val }))}
-                title={alertConfig.title}
-                description={alertConfig.description}
-                onConfirm={alertConfig.onConfirm}
-                variant={alertConfig.variant}
-                confirmText={alertConfig.confirmText}
+                open={alertState.open}
+                onOpenChange={val => setAlertState(prev => ({ ...prev, open: val }))}
+                title={alertState.title}
+                description={alertState.description}
+                variant={alertState.variant}
+                showCancel={alertState.showCancel}
+                onConfirm={alertState.onConfirm}
             />
-        </Dialog>
+        </div>
     )
 }

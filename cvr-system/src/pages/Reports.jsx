@@ -37,10 +37,10 @@ export default function Reports() {
     })
 
     // Filter Logic
-    const portfolios = ['All', ...new Set(riskData?.map(d => d.business_unit).filter(Boolean))]
+    const portfolios = ['All', ...new Set(riskData?.map(d => d.portfolio).filter(Boolean))]
 
     const filteredContracts = riskData?.filter(c => {
-        const matchesPortfolio = selectedPortfolio === 'All' || c.business_unit === selectedPortfolio
+        const matchesPortfolio = selectedPortfolio === 'All' || c.portfolio === selectedPortfolio
         const isAtRisk = c.current_forecast_margin_pct < riskThreshold
         return matchesPortfolio && isAtRisk
     }) || []
@@ -122,7 +122,7 @@ export default function Reports() {
                                             {c.contract_code} - {c.contract_name}
                                             {c.margin_variance < -5 && <span className="ml-2 text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">Critical</span>}
                                         </td>
-                                        <td className="px-4 py-3 text-gray-500">{c.business_unit}</td>
+                                        <td className="px-4 py-3 text-gray-500">{c.portfolio}</td>
                                         <td className="px-4 py-3 text-right">${(c.final_revenue / 1000).toFixed(0)}k</td>
                                         <td className="px-4 py-3 text-right text-gray-500">{c.target_margin_pct}%</td>
                                         <td className={`px-4 py-3 text-right font-bold ${c.current_forecast_margin_pct < c.target_margin_pct ? 'text-red-600' : 'text-green-600'}`}>

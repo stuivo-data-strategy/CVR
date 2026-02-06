@@ -3,23 +3,32 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card'
 import { Button } from '../ui/Button'
+import { AlertDialog } from '../ui/AlertDialog'
 import { Plus, Trash2, Check, X } from 'lucide-react'
 
 export default function ScenarioManager({ contractId, selectedScenarioId, onScenarioSelect }) {
     const queryClient = useQueryClient()
     const [isCreating, setIsCreating] = useState(false)
     const [newScenarioName, setNewScenarioName] = useState('')
+    const [alertState, setAlertState] = useState({ open: false, title: '', description: '', variant: 'default', onConfirm: null })
 
-    // Fetch Scenarios
+    // Fetch Scenarios with change count
     const { data: scenarios, isLoading } = useQuery({
         queryKey: ['scenarios', contractId],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('contract_scenarios')
-                .select('*')
+                .select('*, contract_scenario_changes(count)')
                 .eq('contract_id', contractId)
                 .order('created_at', { ascending: false })
-            return data || []
+
+            if (error) throw error
+
+            // Transform to include count property directly
+            return data?.map(s => ({
+                ...s,
+                changeCount: s.contract_scenario_changes?.[0]?.count || 0
+            })) || []
         }
     })
 
@@ -118,7 +127,24 @@ export default function ScenarioManager({ contractId, selectedScenarioId, onScen
             queryClient.invalidateQueries(['scenarios', contractId])
             queryClient.invalidateQueries(['contract', contractId])
             queryClient.invalidateQueries(['financials', contractId]) // Force chart refresh
-            alert('Scenario promoted! Changes are now Approved and added to the Forecast.')
+            setAlertState({
+                open: true,
+                title: 'Success',
+                description: 'Scenario promoted! Changes are now Approved and added to the Forecast.',
+                variant: 'default',
+                showCancel: false,
+                onConfirm: null
+            })
+        },
+        onError: (err) => {
+            setAlertState({
+                open: true,
+                title: 'Error',
+                description: err.message,
+                variant: 'destructive',
+                showCancel: false,
+                onConfirm: null
+            })
         }
     })
 
@@ -136,6 +162,30 @@ export default function ScenarioManager({ contractId, selectedScenarioId, onScen
             if (selectedScenarioId) onScenarioSelect(null)
         }
     })
+
+    const handleDelete = (e, id) => {
+        e.stopPropagation()
+        setAlertState({
+            open: true,
+            title: 'Delete Scenario',
+            description: 'Delete this scenario? This will not delete the changes themselves, only the scenario wrapper.',
+            variant: 'destructive',
+            showCancel: true,
+            onConfirm: () => deleteMutation.mutate(id)
+        })
+    }
+
+    const handlePromote = (e, id) => {
+        e.stopPropagation()
+        setAlertState({
+            open: true,
+            title: 'Promote to Forecast',
+            description: 'Promote this scenario? \n\nThis will APPROVE all associated changes and add them to the official forecast.',
+            variant: 'default',
+            showCancel: true,
+            onConfirm: () => promoteMutation.mutate(id)
+        })
+    }
 
     if (isLoading) return <div>Loading scenarios...</div>
 
@@ -189,35 +239,37 @@ export default function ScenarioManager({ contractId, selectedScenarioId, onScen
                                 {selectedScenarioId === scenario.id && (
                                     <button
                                         className="text-gray-400 hover:text-red-500 p-1"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            if (confirm('Delete this scenario?')) deleteMutation.mutate(scenario.id)
-                                        }}
+                                        onClick={(e) => handleDelete(e, scenario.id)}
                                     >
                                         <Trash2 size={14} />
                                     </button>
                                 )}
                             </div>
-                            <span className="text-xs text-gray-500 mb-2">{scenario.scenario_type}</span>
+                            <span className="text-xs text-gray-500 mb-2">{scenario.scenario_type} • {scenario.changeCount} Changes</span>
 
                             {selectedScenarioId === scenario.id && (
                                 <Button
                                     size="sm"
-                                    className="w-full mt-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        if (confirm('Promote this scenario? \n\nThis will APPROVE all associated changes and add them to the official forecast.')) {
-                                            promoteMutation.mutate(scenario.id)
-                                        }
-                                    }}
+                                    className="w-full mt-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={scenario.changeCount === 0}
+                                    onClick={(e) => handlePromote(e, scenario.id)}
                                 >
-                                    Promote to Forecast
+                                    {scenario.changeCount > 0 ? 'Promote to Forecast' : 'No Changes to Promote'}
                                 </Button>
                             )}
                         </div>
                     ))}
                 </div>
             </CardContent>
+            <AlertDialog
+                open={alertState.open}
+                onOpenChange={val => setAlertState(prev => ({ ...prev, open: val }))}
+                title={alertState.title}
+                description={alertState.description}
+                variant={alertState.variant}
+                showCancel={alertState.showCancel}
+                onConfirm={alertState.onConfirm}
+            />
         </Card>
     )
 }

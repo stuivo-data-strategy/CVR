@@ -7,22 +7,22 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import CreateContractModal from '../components/CreateContractModal'
 import ImportContractModal from '../components/ImportContractModal'
+import { AlertDialog } from '../components/ui/AlertDialog'
 import { format } from 'date-fns'
 import styles from './Contracts.module.css'
 
 export default function Contracts() {
     const [statusFilter, setStatusFilter] = useState('all')
-    const [portfolioFilter, setPortfolioFilter] = useState('all')
+    const [buFilter, setBuFilter] = useState('all')
     const [sectorFilter, setSectorFilter] = useState('all')
-    const [sortField, setSortField] = useState('created_at')
-    const [sortOrder, setSortOrder] = useState('desc')
-
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+    const [alertState, setAlertState] = useState({ open: false, title: '', description: '', variant: 'default', showCancel: true, onConfirm: null })
+
     const queryClient = useQueryClient()
 
     const { data: contracts, isLoading, error } = useQuery({
-        queryKey: ['contracts', statusFilter, portfolioFilter, sectorFilter, sortField, sortOrder],
+        queryKey: ['contracts', statusFilter],
         queryFn: async () => {
             let query = supabase
                 .from('contracts')
@@ -39,13 +39,13 @@ export default function Contracts() {
             portfolio,
             sector
         `)
-                .order(sortField, { ascending: sortOrder === 'asc' })
+                .order('created_at', { ascending: false })
 
             if (statusFilter !== 'all') {
                 query = query.eq('status', statusFilter)
             }
-            if (portfolioFilter !== 'all') {
-                query = query.eq('portfolio', portfolioFilter)
+            if (buFilter !== 'all') {
+                query = query.eq('portfolio', buFilter)
             }
             if (sectorFilter !== 'all') {
                 query = query.eq('sector', sectorFilter)
@@ -57,15 +57,30 @@ export default function Contracts() {
         }
     })
 
-    const handleDelete = async (id) => {
-        if (!confirm('Are you sure you want to delete this contract?')) return
-
+    const executeDelete = async (id) => {
         const { error } = await supabase.from('contracts').delete().eq('id', id)
         if (error) {
-            alert('Error deleting contract: ' + error.message)
+            setAlertState({
+                open: true,
+                title: 'Error',
+                description: 'Error deleting contract: ' + error.message,
+                variant: 'destructive',
+                showCancel: false,
+                onConfirm: null
+            })
         } else {
             queryClient.invalidateQueries(['contracts'])
         }
+    }
+
+    const handleDelete = (id) => {
+        setAlertState({
+            open: true,
+            title: 'Delete Contract',
+            description: 'Are you sure you want to delete this contract? This action cannot be undone.',
+            variant: 'destructive',
+            onConfirm: () => executeDelete(id)
+        })
     }
 
     // Format currency
@@ -82,8 +97,7 @@ export default function Contracts() {
         <div className={styles.container}>
             <header className={styles.header}>
                 <div>
-                    <h1 className={styles.title}>All Contracts</h1>
-                    <p className={styles.subtitle}>Manage your portfolio and track performance.</p>
+                    <h1 className="text-2xl font-bold tracking-tight">Contract Register</h1>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
@@ -116,15 +130,13 @@ export default function Contracts() {
                     </select>
                     <select
                         className={styles.select}
-                        value={portfolioFilter}
-                        onChange={(e) => setPortfolioFilter(e.target.value)}
+                        value={buFilter}
+                        onChange={(e) => setBuFilter(e.target.value)}
                     >
-                        <option value="all">Portfolio: All</option>
-                        <option value="PF00001">PF00001 (Infra-Pub)</option>
-                        <option value="PF00002">PF00002 (Const-Pub)</option>
-                        <option value="PF00003">PF00003 (Serv-Pub)</option>
-                        <option value="PF00004">PF00004 (Const-Com)</option>
-                        <option value="PF00005">PF00005 (Serv-Com)</option>
+                        <option value="all">BU: All</option>
+                        <option value="Construction">Construction</option>
+                        <option value="Infrastructure">Infrastructure</option>
+                        <option value="Services">Services</option>
                     </select>
                     <select
                         className={styles.select}
@@ -145,51 +157,28 @@ export default function Contracts() {
                     <table className={styles.table}>
                         <thead>
                             <tr>
-                                {[
-                                    { label: 'Portfolio', field: 'portfolio' },
-                                    { label: 'Code', field: 'contract_code' },
-                                    { label: 'Contract Name', field: 'name' },
-                                    { label: 'Sector', field: 'sector' },
-                                    { label: 'Status', field: 'status' },
-                                    { label: 'Value', field: 'original_value' },
-                                    { label: 'Margin %', field: 'target_margin_pct' },
-                                    { label: 'Start Date', field: 'start_date' },
-                                    { label: 'End Date', field: 'end_date' },
-                                ].map((col) => (
-                                    <th
-                                        key={col.field}
-                                        className={`${styles.th} cursor-pointer hover:bg-gray-100 transition-colors select-none`}
-                                        onClick={() => {
-                                            if (sortField === col.field) {
-                                                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-                                            } else {
-                                                setSortField(col.field)
-                                                setSortOrder('asc')
-                                            }
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-1">
-                                            {col.label}
-                                            {sortField === col.field && (
-                                                <span className="text-xs">{sortOrder === 'asc' ? '▲' : '▼'}</span>
-                                            )}
-                                        </div>
-                                    </th>
-                                ))}
+                                <th className={styles.th}>Code</th>
+                                <th className={styles.th}>Contract Name</th>
+                                <th className={styles.th}>Customer</th>
+                                <th className={styles.th}>BU / Sector</th>
+                                <th className={styles.th}>Status</th>
+                                <th className={styles.th}>Value</th>
+                                <th className={styles.th}>Margin %</th>
+                                <th className={styles.th}>Start Date</th>
+                                <th className={styles.th}>End Date</th>
                                 <th className={styles.th}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {contracts?.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="text-center p-8 text-gray-500">
+                                    <td colSpan={9} className="text-center p-8 text-gray-500">
                                         No contracts found. Create one to get started.
                                     </td>
                                 </tr>
                             ) : (
                                 contracts?.map((contract) => (
                                     <tr key={contract.id} className={styles.tr}>
-                                        <td className={styles.td}>{contract.portfolio}</td>
                                         <td className={styles.td}>
                                             <Link to={`/contracts/${contract.id}`} className={styles.link}>
                                                 {contract.contract_code}
@@ -198,8 +187,13 @@ export default function Contracts() {
                                         <td className={styles.td}>
                                             <span className="font-medium">{contract.name}</span>
                                         </td>
-                                        <td className={styles.td}>{contract.sector}</td>
-
+                                        <td className={styles.td}>{contract.customer_name}</td>
+                                        <td className={styles.td}>
+                                            <div className="flex flex-col text-xs">
+                                                <span className="font-medium">{contract.portfolio || '-'}</span>
+                                                <span className="text-gray-500">{contract.sector || '-'}</span>
+                                            </div>
+                                        </td>
                                         <td className={styles.td}>
                                             <span className={`${styles.badge} ${styles[contract.status]}`}>
                                                 {contract.status.replace('_', ' ')}
@@ -222,11 +216,6 @@ export default function Contracts() {
                 </div>
             </Card>
 
-            <CreateContractModal
-                open={isCreateModalOpen}
-                onOpenChange={setIsCreateModalOpen}
-            />
-
             {isCreateModalOpen && (
                 <CreateContractModal
                     onClose={() => setIsCreateModalOpen(false)}
@@ -247,6 +236,16 @@ export default function Contracts() {
                     }}
                 />
             )}
+
+            <AlertDialog
+                open={alertState.open}
+                onOpenChange={val => setAlertState(prev => ({ ...prev, open: val }))}
+                title={alertState.title}
+                description={alertState.description}
+                variant={alertState.variant}
+                showCancel={alertState.showCancel}
+                onConfirm={alertState.onConfirm}
+            />
         </div>
     )
 }

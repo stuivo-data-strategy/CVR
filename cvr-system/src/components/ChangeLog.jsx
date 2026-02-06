@@ -4,12 +4,14 @@ import { supabase } from '../lib/supabase'
 import { Button } from './ui/Button'
 import { Plus, Trash2 } from 'lucide-react'
 import { ContractChangeForm } from './ContractChangeForm'
+import { AlertDialog } from './ui/AlertDialog'
 import { format } from 'date-fns'
 import styles from './ChangeLog.module.css'
 
 export default function ChangeLog({ contractId }) {
     const queryClient = useQueryClient()
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [alertState, setAlertState] = useState({ open: false, title: '', description: '', variant: 'default', showCancel: true, onConfirm: null })
 
     const { data: changes, isLoading } = useQuery({
         queryKey: ['changes', contractId],
@@ -24,11 +26,30 @@ export default function ChangeLog({ contractId }) {
         }
     })
 
-    const handleDelete = async (id) => {
-        if (!confirm('Delete change?')) return
+    const executeDelete = async (id) => {
         const { error } = await supabase.from('contract_changes').delete().eq('id', id)
-        if (error) alert(error.message)
-        else queryClient.invalidateQueries(['changes', contractId])
+        if (error) {
+            setAlertState({
+                open: true,
+                title: 'Error',
+                description: error.message,
+                variant: 'destructive',
+                showCancel: false,
+                onConfirm: null
+            })
+        } else {
+            queryClient.invalidateQueries(['changes', contractId])
+        }
+    }
+
+    const handleDelete = (id) => {
+        setAlertState({
+            open: true,
+            title: 'Delete Change Request',
+            description: 'Are you sure you want to delete this change request?',
+            variant: 'destructive',
+            onConfirm: () => executeDelete(id)
+        })
     }
 
     // Formatting
@@ -90,6 +111,16 @@ export default function ChangeLog({ contractId }) {
                     }}
                 />
             )}
+
+            <AlertDialog
+                open={alertState.open}
+                onOpenChange={val => setAlertState(prev => ({ ...prev, open: val }))}
+                title={alertState.title}
+                description={alertState.description}
+                variant={alertState.variant}
+                showCancel={alertState.showCancel}
+                onConfirm={alertState.onConfirm}
+            />
         </div>
     )
 }

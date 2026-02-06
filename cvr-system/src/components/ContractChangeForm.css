@@ -14,9 +14,9 @@
 
 .modal-container {
     background-color: white;
-    width: 900px;
+    width: 1200px;
     max-width: 95vw;
-    height: 85vh;
+    height: 90vh;
     border-radius: 8px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     display: flex;
@@ -129,19 +129,23 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 0.85rem;
+    table-layout: auto;
+    /* Allow auto width based on content */
 }
 
 .mini-table th {
     text-align: left;
-    padding: 0.5rem;
+    padding: 0.75rem 0.5rem;
     background-color: #f1f5f9;
-    color: #64748b;
-    font-weight: 500;
+    color: #475569;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .mini-table td {
-    padding: 0.25rem 0.5rem;
+    padding: 0.5rem;
     border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
 }
 
 .mini-table input,
