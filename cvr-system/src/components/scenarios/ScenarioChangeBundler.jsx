@@ -20,7 +20,8 @@ export default function ScenarioChangeBundler({ contractId, scenarioId }) {
                 .from('contract_changes')
                 .select('*')
                 .eq('contract_id', contractId)
-                .eq('status', 'proposed')
+                .neq('status', 'implemented') // Allow proposed, approved, etc. to be bundled
+                .neq('status', 'rejected')
             return data || []
         }
     })
@@ -119,6 +120,7 @@ export default function ScenarioChangeBundler({ contractId, scenarioId }) {
                     onClose={() => setIsCreateModalOpen(false)}
                     onSuccess={() => {
                         queryClient.invalidateQueries(['proposed_changes', contractId])
+                        queryClient.invalidateQueries(['changes', contractId])
                     }}
                 />
             )}

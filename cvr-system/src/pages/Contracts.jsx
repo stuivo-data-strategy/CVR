@@ -133,7 +133,7 @@ export default function Contracts() {
                         value={buFilter}
                         onChange={(e) => setBuFilter(e.target.value)}
                     >
-                        <option value="all">BU: All</option>
+                        <option value="all">Portfolio: All</option>
                         <option value="Construction">Construction</option>
                         <option value="Infrastructure">Infrastructure</option>
                         <option value="Services">Services</option>
@@ -160,7 +160,7 @@ export default function Contracts() {
                                 <th className={styles.th}>Code</th>
                                 <th className={styles.th}>Contract Name</th>
                                 <th className={styles.th}>Customer</th>
-                                <th className={styles.th}>BU / Sector</th>
+                                <th className={styles.th}>Portfolio / Sector</th>
                                 <th className={styles.th}>Status</th>
                                 <th className={styles.th}>Value</th>
                                 <th className={styles.th}>Margin %</th>

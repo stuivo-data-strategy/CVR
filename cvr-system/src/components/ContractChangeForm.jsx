@@ -43,7 +43,7 @@ const emptyChange = (contractId, userId) => ({
     impacts: [], // {id, period_month, revenue_delta, cost_delta, cost_category_id, is_scenario_only}
     // Forecasting
     conversion_probability_pct: 100,
-    potential_disallowed_costs: 0,
+    anticipated_disallowed_cost: 0,
     disallowed_cost_notes: '',
     // Risk
     risk_level: 'low',
@@ -62,6 +62,8 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
     const [costCategories, setCostCategories] = useState([])
     const [profiles, setProfiles] = useState([])
     const [activeTab, setActiveTab] = useState('identification') // identification, financial, forecasting, governance
+
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
     const [alertState, setAlertState] = useState({
         open: false,
@@ -135,6 +137,7 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
             ...prev,
             impacts: [...(prev.impacts || []), {
                 id: generateId(),
+                category_id: costCategories[0]?.id || null, // Default to first available category if needed
                 period_month: new Date().toISOString().slice(0, 7) + '-01', // Default to current month 1st
                 revenue_delta: 0,
                 cost_delta: 0,
@@ -159,6 +162,7 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
 
     // --- SUBMIT ---
     const saveChanges = async () => {
+        setIsSubmitting(true)
         try {
             // 2. Upsert Contract Change
             const { cost_breakdown, impacts, ...mainChangeData } = formData
@@ -186,22 +190,19 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                 technical_owner: mainChangeData.technical_owner || null,
                 customer_contact: mainChangeData.customer_contact,
                 customer_approval_received: mainChangeData.customer_approval_received,
-                approval_date: mainChangeData.approval_date || null
-                // ... forecast fields
+                approval_date: mainChangeData.approval_date || null,
+                risk_narrative: mainChangeData.risk_narrative,
+                opportunity_narrative: mainChangeData.opportunity_narrative,
+                anticipated_disallowed_cost: mainChangeData.anticipated_disallowed_cost,
+                conversion_probability_pct: mainChangeData.conversion_probability_pct,
+                tags: mainChangeData.tags
             }
 
-            // Update or Insert
-            const { data: changeParams, error: mainError } = await supabase
-                .from('contract_changes')
-                .upsert(insertData)
-                .select()
-                .single()
-
-            if (mainError) throw mainError
-
             // 3. Handle Impacts (Delete all and re-insert for simplicity)
-            let finalId = formData.id // if we decide to force UUID client side
+            // Use client-generated ID to prevent double creation if this is a new record
+            let finalId = formData.id
 
+            // Single UPSERT with ID included
             const { error: upsertErr } = await supabase.from('contract_changes').upsert({
                 id: finalId,
                 ...insertData
@@ -225,6 +226,21 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                 if (impErr) throw impErr
             }
 
+            // Delete existing cost breakdown
+            await supabase.from('contract_change_cost_breakdown').delete().eq('contract_change_id', finalId)
+
+            // Insert new cost breakdown
+            if (formData.cost_breakdown?.length > 0) {
+                const breakdownRows = formData.cost_breakdown.map(i => ({
+                    contract_change_id: finalId,
+                    category_id: i.category_id,
+                    cost_delta: i.cost_delta,
+                    notes: i.notes
+                }))
+                const { error: bdErr } = await supabase.from('contract_change_cost_breakdown').insert(breakdownRows)
+                if (bdErr) throw bdErr
+            }
+
             onSuccess()
             onClose()
 
@@ -238,6 +254,8 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                 showCancel: false,
                 onConfirm: () => closeAlert()
             })
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -529,7 +547,7 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                 </div>
                 <div className="flex flex-col gap-1">
                     <label className="text-sm font-medium text-gray-700">Pot. Disallowed Costs</label>
-                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" value={formData.potential_disallowed_costs} onChange={e => handleChange('potential_disallowed_costs', parseFloat(e.target.value))} />
+                    <input className="border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" type="number" value={formData.anticipated_disallowed_cost} onChange={e => handleChange('anticipated_disallowed_cost', parseFloat(e.target.value))} />
                 </div>
                 <div className="flex flex-col gap-1 col-span-2">
                     <label className="text-sm font-medium text-gray-700">Tags (comma sep)</label>
@@ -582,7 +600,9 @@ export const ContractChangeForm = ({ contractId, onClose, onSuccess, initialData
                             </div>
                             <div className="flex gap-2">
                                 <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                                <Button type="submit">Save Change Request</Button>
+                                <Button type="submit" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Saving...' : 'Save Change Request'}
+                                </Button>
                             </div>
                         </div>
                     </div>

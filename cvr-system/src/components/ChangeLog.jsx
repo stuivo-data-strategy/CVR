@@ -39,6 +39,7 @@ export default function ChangeLog({ contractId }) {
             })
         } else {
             queryClient.invalidateQueries(['changes', contractId])
+            queryClient.invalidateQueries(['proposed_changes', contractId])
         }
     }
 
@@ -70,6 +71,7 @@ export default function ChangeLog({ contractId }) {
                     <thead>
                         <tr>
                             <th className={styles.th}>Code</th>
+                            <th className={styles.th}>Title</th>
                             <th className={styles.th}>Description</th>
                             <th className={styles.th}>Type</th>
                             <th className={styles.th}>Status</th>
@@ -85,6 +87,7 @@ export default function ChangeLog({ contractId }) {
                             changes?.map(change => (
                                 <tr key={change.id} className={styles.tr}>
                                     <td className={styles.td}>{change.change_code}</td>
+                                    <td className={styles.td}><strong>{change.title}</strong></td>
                                     <td className={styles.td}>{change.description}</td>
                                     <td className={styles.td}><span className={styles.pill}>{change.change_type?.replace('_', ' ')}</span></td>
                                     <td className={styles.td}><span className={`${styles.pill} ${styles[change.status]}`}>{change.status}</span></td>
@@ -108,6 +111,7 @@ export default function ChangeLog({ contractId }) {
                     onClose={() => setIsModalOpen(false)}
                     onSuccess={() => {
                         queryClient.invalidateQueries(['changes', contractId])
+                        queryClient.invalidateQueries(['proposed_changes', contractId])
                     }}
                 />
             )}

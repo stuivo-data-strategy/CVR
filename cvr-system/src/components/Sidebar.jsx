@@ -14,9 +14,9 @@ export default function Sidebar() {
 
     return (
         <aside className={styles.sidebar}>
-            <div className={styles.logo}>
-                <img src="/logo.png" alt="CVR" style={{ height: '32px', width: '32px', objectFit: 'contain', marginRight: '8px' }} />
-                <span className={styles.logoText}>Cost Value Reconciliation</span>
+            <div className={styles.logo} style={{ flexDirection: 'column', alignItems: 'center', padding: '2rem 1rem', height: 'auto' }}>
+                <img src="/logo.png" alt="CVR" style={{ height: '128px', width: '128px', objectFit: 'contain', marginBottom: '1rem' }} />
+                <span className={styles.logoText} style={{ textAlign: 'center' }}>Cost Value Reconciliation</span>
             </div>
             <nav className={styles.nav}>
                 {navItems.map((item) => (
